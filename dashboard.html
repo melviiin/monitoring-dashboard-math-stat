@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>prodi.monitor — Dept. Mathematics & Statistics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;}
+  #root{min-height:100vh;}
+  #boot-error{display:none;font-family:monospace;white-space:pre-wrap;padding:24px;color:#c0392b;background:#fff3f2;}
+</style>
+<style>
+/* ===== BASE RESET (shared with login) ===== */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Segoe UI','Source Sans 3',system-ui,-apple-system,sans-serif;
+  min-height:100vh;
+  transition:background .25s ease;
+}
+a{color:inherit}
+button{font-family:inherit}
+::selection{background:#1a8fd6;color:#fff}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+}
+input:focus-visible,button:focus-visible,select:focus-visible,a:focus-visible{
+  outline:2px solid #1a8fd6;
+  outline-offset:2px;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="boot-error"></div>
+
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script type="text/plain" id="app-source">
+const { useState, useMemo, useEffect, useRef } = React;
+
+function UserMenuPortal({ anchorRef, open, onClose, children }) {
+  const [pos, setPos] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = () => onClose();
+    const handleEsc = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("click", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("click", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [open, onClose]);
+
+  if (!open || !pos) return null;
+
+  return ReactDOM.createPortal(
+    <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 1000 }}>
+      {children}
+    </div>,
+    document.body
+  );
+}
+
+let KPI_AGG = {"Math":{"cats":{"CBE":{"label":"Capacity Building","achieved":13,"total":30},"ENB":{"label":"Enabler","achieved":2,"total":4},"ECO":{"label":"Economic Growth","achieved":1,"total":4},"REC":{"label":"Recognition","achieved":5,"total":11}},"lagging":[{"code":"R2.2.A.2","name":"Entrepreneur (6 mo after graduation)","p":"Recognition","target":20.0,"real":15.0,"unit":"Persentase","score":1},{"code":"—","name":"International Research Network (IRN)","p":"Capacity Building","target":3.0,"real":2.25,"unit":"Article","score":1},{"code":"C5.4.A.2","name":"Products Commercialized","p":"Capacity Building","target":2.5,"real":1.38,"unit":"Produk","score":1},{"code":"E2.4.A.1.","name":"Lecturer Internship","p":"Enabler","target":1.0,"real":0.9,"unit":"Dosen","score":1},{"code":"G4.2.A.1","name":"Active Student Regular Program - Undergraduate) - Genap 2025/2026","p":"Economic Growth","target":100.0,"real":55.0,"unit":"Mahasiswa","score":1},{"code":"G4.2.A.1","name":"Active Student Regular Program - Undergraduate) - Ganjil 2026/2027","p":"Economic Growth","target":89.0,"real":80.1,"unit":"Mahasiswa","score":1}],"total":49,"achieved":21},"Stat":{"cats":{"CBE":{"label":"Capacity Building","achieved":15,"total":28},"ENB":{"label":"Enabler","achieved":0,"total":3},"ECO":{"label":"Economic Growth","achieved":1,"total":4},"REC":{"label":"Recognition","achieved":7,"total":11}},"lagging":[{"code":"R2.2.A.2","name":"Entrepreneur (6 mo after graduation)","p":"Recognition","target":20.0,"real":11.0,"unit":"Persentase","score":1},{"code":"G4.2.A.1","name":"Active Student Regular Program - Undergraduate) - Ganjil 2026/2027","p":"Economic Growth","target":87.0,"real":65.25,"unit":"Mahasiswa","score":1},{"code":"—","name":"# FM JJA (Kenaikan JJA TP ke AA)","p":"Enabler","target":1.0,"real":0.75,"unit":"Dosen","score":1},{"code":"R4.1.A.1","name":"Academic Satisfaction","p":"Recognition","target":80.0,"real":60.0,"unit":"Persentase","score":1},{"code":"—","name":"Massive Open Online Course","p":"Enabler","target":1.0,"real":1.08,"unit":"Course","score":1},{"code":"—","name":"Local Universities Partnership - SelfDev","p":"Capacity Building","target":1.0,"real":1.08,"unit":"Kegiatan","score":1}],"total":46,"achieved":23}};let PI_ROWS = [{"no":1,"div":"Math","p":"ECO","goal":"4. Student Numbers (Intake and Active Students) (G4)","code":"G4.1.A.1","name":"New Student Intake (Regular Program - Undergraduate)","unit":"Mahasiswa","type":"Q","fokus":1,"prereq":1,"bobot":0.46,"tq":[10.0,20.0,30.0,30.0],"target":30.0,"real":30.0,"score":4,"ranges":[[0.0,23.0],[24.0,26.0],[27.0,29.0],[30.0,34.0],[35.0,39.0],[40.0,100.0]],"prov":"Jodi Oktrianto Putro"},{"no":2,"div":"Math","p":"ECO","goal":"4. Student Numbers (Intake and Active Students) (G4)","code":"G4.2.A.1","name":"Active Student Regular Program - Undergraduate) - Genap 2025/2026","unit":"Mahasiswa","type":"Q","fokus":1,"prereq":0,"bobot":0.25,"tq":[null,100.0,100.0,100.0],"target":100.0,"real":55.0,"score":1,"ranges":[[0.0,93.0],[94.0,96.0],[97.0,99.0],[100.0,101.0],[102.0,102.0],[103.0,999.0]],"prov":"Yovita Tunardi"},{"no":3,"div":"Math","p":"ECO","goal":"4. Student Numbers (Intake and Active Students) (G4)","code":"G4.2.A.1","name":"Active Student Regular Program - Undergraduate) - Ganjil 2026/2027","unit":"Mahasiswa","type":"Q","fokus":1,"prereq":0,"bobot":0.25,"tq":[null,null,null,89.0],"target":89.0,"real":80.1,"score":1,"ranges":[[0.0,82.0],[83.0,85.0],[86.0,88.0],[89.0,89.0],[90.0,90.0],[91.0,199.0]],"prov":"Yovita Tunardi"},{"no":4,"div":"Math","p":"ECO","goal":"5. Non Tuition Revenue (G5)","code":"G5.3.A.1","name":"Other revenue stream (research ) - Jurusan","unit":"Rupiah","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[126500000.0,253000000.0,379500000.0,506000000.0],"target":506000000.0,"real":379500000.0,"score":2,"ranges":[[0.0,328999999.99],[329000000.0,404999999.99],[405000000.0,505999999.99],[506000000.0,556999999.99],[557000000.0,606999999.99],[607000000.0,10000000000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":5,"div":"Math","p":"REC","goal":"8. Global Employability (R2)","code":"R2.1.A.1","name":"Employment Rate (on graduation)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.13,"tq":[null,null,80.0,80.0],"target":80.0,"real":80.0,"score":4,"ranges":[[0.0,69.99],[70.0,74.99],[75.0,79.99],[80.0,84.99],[85.0,89.99],[90.0,100.0]],"prov":"Ratna Sari"},{"no":6,"div":"Math","p":"REC","goal":"8. Global Employability (R2)","code":"R2.1.A.2.","name":"Employment Rate (6 mo after graduation)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.17,"tq":[85.0,85.0,85.0,85.0],"target":85.0,"real":85.0,"score":4,"ranges":[[0.0,74.99],[75.0,79.99],[80.0,84.99],[85.0,89.99],[90.0,94.99],[95.0,100.0]],"prov":"Ratna Sari"},{"no":7,"div":"Math","p":"REC","goal":"8. Global Employability (R2)","code":"R2.2.A.1","name":"Global Employability (6 mo after graduation)","unit":"Persentase","type":"Q","fokus":1,"prereq":1,"bobot":0.86,"tq":[60.0,60.0,60.0,60.0],"target":60.0,"real":64.8,"score":6,"ranges":[[0.0,56.99],[57.0,58.49],[58.5,59.99],[60.0,61.49],[61.5,62.99],[63.0,100.0]],"prov":"Ratna Sari"},{"no":8,"div":"Math","p":"REC","goal":"8. Global Employability (R2)","code":"R2.2.A.2","name":"Entrepreneur (6 mo after graduation)","unit":"Persentase","type":"Q","fokus":1,"prereq":0,"bobot":0.86,"tq":[20.0,20.0,20.0,20.0],"target":20.0,"real":15.0,"score":1,"ranges":[[0.0,17.99],[18.0,18.99],[19.0,19.99],[20.0,20.99],[21.0,21.99],[22.0,100.0]],"prov":"Ratna Sari"},{"no":9,"div":"Math","p":"REC","goal":"8. Global Employability (R2)","code":"R2.4.A.1","name":"Graduates Certification (on Graduation)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.1,"tq":[null,80.0,80.0,80.0],"target":80.0,"real":72.0,"score":3,"ranges":[[0.0,59.99],[60.0,69.99],[70.0,79.99],[80.0,84.99],[85.0,89.99],[90.0,100.0]],"prov":"Veronica"},{"no":10,"div":"Math","p":"REC","goal":"9. Global Recognition (R3)","code":"R3.7.A.1","name":"Students Competition","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":0.13,"tq":[null,null,null,null],"target":null,"real":null,"score":2,"ranges":[null,null,null,null,null,null],"prov":"Devyano Luhukay"},{"no":11,"div":"Math","p":"REC","goal":"10. Academic Satisfaction & Stakeholder Satisfaction (R4)","code":"R4.1.A.1","name":"Academic Satisfaction","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.15,"tq":[null,80.0,80.0,80.0],"target":80.0,"real":60.0,"score":1,"ranges":[[0.0,65.99],[66.0,72.99],[73.0,79.99],[80.0,85.99],[86.0,90.99],[91.0,100.0]],"prov":"Cuk Tho"},{"no":12,"div":"Math","p":"REC","goal":"10. Academic Satisfaction & Stakeholder Satisfaction (R4)","code":"R4.2.A.1","name":"Stakeholder Satisfaction","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.15,"tq":[null,null,null,80.0],"target":80.0,"real":72.0,"score":2,"ranges":[[0.0,65.99],[66.0,72.99],[73.0,79.99],[80.0,85.99],[86.0,90.99],[91.0,100.0]],"prov":"Cuk Tho"},{"no":13,"div":"Math","p":"REC","goal":"11. Grants & Endowments (R5)","code":"R5.2.A.1","name":"Alumni Engagement","unit":"Rupiah","type":"Q","fokus":0,"prereq":0,"bobot":0.29,"tq":[4965000.0,9930000.0,14895000.0,19860000.0],"target":19860000.0,"real":19860000.0,"score":4,"ranges":[[0.0,15887999.99],[15888000.0,17873999.99],[17874000.0,19859999.99],[19860000.0,21845999.99],[21846000.0,23831999.99],[23832000.0,10000000000.0]],"prov":"Agus Edy Sutomo"},{"no":14,"div":"Math","p":"REC","goal":"12. Empowering The Society (R6)","code":"R6.2.A.2","name":"# Technologies Used","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":0.58,"tq":[null,null,null,null],"target":null,"real":null,"score":5,"ranges":[null,null,null,null,null,null],"prov":"Hendy Risdianto Wijaya"},{"no":15,"div":"Math","p":"REC","goal":"12. Empowering The Society (R6)","code":"R6.7.A.1","name":"Students Participations in Impactful  Empowering Society Activity","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.15,"tq":[null,null,74.0,74.0],"target":74.0,"real":55.5,"score":1,"ranges":[[0.0,59.99],[60.0,67.49],[67.5,73.99],[74.0,75.99],[76.0,77.99],[78.0,100.0]],"prov":"Andyni Khosasih"},{"no":16,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - Research","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,null,1.0,2.0],"target":2.0,"real":2.0,"score":4,"ranges":[[0.0,0.0],null,[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":17,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - ComDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[1.0,2.0,3.0,4.0],"target":4.0,"real":4.0,"score":4,"ranges":[[0.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,5.0],[6.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":18,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - SelfDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.04,"tq":[null,null,null,1.0],"target":1.0,"real":0.75,"score":1,"ranges":[[0.0,0.0],null,null,[1.0,1.0],[2.0,2.0],[3.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":19,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - Teaching","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.02,"tq":[3.0,6.0,9.0,10.0],"target":10.0,"real":10.0,"score":4,"ranges":[[0.0,4.0],[5.0,7.0],[8.0,9.0],[10.0,1000.0],null,null],"prov":"Theodora Subyantoro"},{"no":20,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - Research","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":3.24,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":21,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - ComDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":1.65,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":22,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - SelfDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.04,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":3.24,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":23,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - Teaching","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.02,"tq":[4.0,8.0,12.0,15.0],"target":15.0,"real":15.0,"score":4,"ranges":[[0.0,6.0],[7.0,9.0],[10.0,14.0],[15.0,17.0],[18.0,100.0],null],"prov":"Theodora Subyantoro"},{"no":24,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - Research","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":2.7,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":25,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - SelfDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.04,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":2.25,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":26,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - ComDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[1.0,2.0,3.0,5.0],"target":5.0,"real":6.0,"score":5,"ranges":[[0.0,1.0],[2.0,2.0],[3.0,4.0],[5.0,5.0],[6.0,6.0],[7.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":27,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - Teaching","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.02,"tq":[4.0,8.0,12.0,15.0],"target":15.0,"real":13.5,"score":3,"ranges":[[0.0,6.0],[7.0,10.0],[11.0,15.0],[15.0,100.0],[17.0,100.0],[17.0,100.0]],"prov":"Theodora Subyantoro"},{"no":28,"div":"Math","p":"CBE","goal":"13. Global Partnership (C1)","code":"C1.2.C.1","name":"International experience","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.07,"tq":[null,75.0,75.0,75.0],"target":75.0,"real":56.25,"score":1,"ranges":[[0.0,59.99],[60.0,64.99],[65.0,74.99],null,null,null],"prov":"Debby Sonita Lubis"},{"no":29,"div":"Math","p":"CBE","goal":"14. Operational Excellence (C2)","code":"","name":"On time Internal Audit Findings being followed up by Units and Prodis","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,null,null],"target":null,"real":null,"score":2,"ranges":[null,null,null,null,null,null],"prov":"Cuk Tho"},{"no":30,"div":"Math","p":"CBE","goal":"14. Operational Excellence (C2)","code":"","name":"Tingkat penyelesaian course di  Beelingua oleh B2028","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.12,"tq":[null,null,null,80.0],"target":80.0,"real":72.0,"score":3,"ranges":[[0.0,59.99],[60.0,69.99],[70.0,79.99],[80.0,89.99],[90.0,94.99],[95.0,100.0]],"prov":"Hendra Bakti"},{"no":31,"div":"Math","p":"CBE","goal":"14. Operational Excellence (C2)","code":"C2.8.A.1.","name":"On Time Graduation - Undergraduate","unit":"Persentase","type":"Q","fokus":1,"prereq":1,"bobot":0.55,"tq":[null,null,70.0,70.0],"target":70.0,"real":63.0,"score":3,"ranges":[[0.0,49.99],[50.0,59.99],[60.0,69.99],[70.0,74.99],[75.0,79.99],[80.0,100.0]],"prov":"Lianna Sugandi"},{"no":32,"div":"Math","p":"CBE","goal":"14. Operational Excellence (C2)","code":"C2.9.A.1.","name":"Percentage Max of NR Students - Ganjil","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.07,"tq":[null,15.0,15.0,15.0],"target":15.0,"real":13.5,"score":4,"ranges":[[20.01,100.0],[17.51,20.0],[15.01,17.5],[12.51,15.0],[10.0,12.5],[0.0,9.99]],"prov":"Ria Devita DJS"},{"no":33,"div":"Math","p":"CBE","goal":"14. Operational Excellence (C2)","code":"C2.9.A.1.","name":"Percentage Max of NR Students - Genap","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.06,"tq":[null,null,15.0,15.0],"target":15.0,"real":8.25,"score":6,"ranges":[[20.01,100.0],[17.51,20.0],[15.01,17.5],[12.51,15.0],[10.0,12.5],[0.0,9.99]],"prov":"Ria Devita DJS"},{"no":34,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"","name":"MULTIDISICPLINARY RESEARCH OUTPUT (2 PER FACULTY/SCHOOL)","unit":"Research","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,1.0,2.0],"target":2.0,"real":1.8,"score":3,"ranges":[[0.0,0.99],null,[1.0,1.99],[2.0,2.99],[3.0,3.99],[4.0,10000.0]],"prov":"Brilly Andro Makalew"},{"no":35,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"","name":"International Research Network (IRN)","unit":"Article","type":"Q","fokus":0,"prereq":0,"bobot":0.58,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":2.25,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,100.0]],"prov":"Brilly Andro Makalew"},{"no":36,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.A.1.","name":"# of SCOPUS Publication FM","unit":"Publikasi","type":"Q","fokus":1,"prereq":0,"bobot":2,"tq":[5.0,10.0,15.0,22.0],"target":22.0,"real":23.76,"score":4,"ranges":[[0.0,14.99],[15.0,17.99],[18.0,21.99],[22.0,24.99],[25.0,26.99],[27.0,10000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":37,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.A.2.","name":"# of SCOPUS Publication MHS","unit":"Publikasi","type":"Q","fokus":1,"prereq":0,"bobot":1.2,"tq":[3.0,6.0,9.0,10.0],"target":10.0,"real":7.5,"score":2,"ranges":[[0.0,6.99],[7.0,7.99],[8.0,9.99],[10.0,10.99],[11.0,11.99],[12.0,10000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":38,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.B.1.","name":"New Citation","unit":"New Citation","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[35.0,70.0,105.0,139.0],"target":139.0,"real":125.1,"score":3,"ranges":[[0.0,90.99],[91.0,111.99],[112.0,138.99],[139.0,152.99],[153.0,166.99],[167.0,10000.0]],"prov":"Brilly Andro Makalew"},{"no":39,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.B.2.","name":"New Citation (External)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[75.0,75.0,75.0,75.0],"target":75.0,"real":75.0,"score":4,"ranges":[[0.0,52.99],[53.0,64.99],[65.0,74.99],[75.0,82.99],[83.0,89.99],[90.0,100.0]],"prov":"Brilly Andro Makalew"},{"no":40,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.3.A.1.","name":"Research Program","unit":"Poin","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[3.0,6.0,9.0,13.0],"target":13.0,"real":14.04,"score":4,"ranges":[[0.0,8.99],[9.0,10.99],[11.0,12.99],[13.0,14.99],[15.0,15.99],[16.0,10000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":41,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.3.A.2.","name":"Research Program (International)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,null,60.0],"target":60.0,"real":54.0,"score":3,"ranges":[[0.0,29.99],[30.0,44.99],[45.0,59.99],[60.0,74.99],[75.0,89.99],[90.0,100.0]],"prov":"Brilly Andro Makalew"},{"no":42,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.4.A.1.","name":"# of new IP(s)","unit":"IP","type":"Q","fokus":0,"prereq":0,"bobot":0.19,"tq":[1.0,2.0,3.0,4.0],"target":4.0,"real":3.0,"score":6,"ranges":[null,[2.0,2.99],null,null,null,null],"prov":"Hendy Risdianto Wijaya"},{"no":43,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.4.A.2","name":"Products Commercialized","unit":"Produk","type":"Q","fokus":0,"prereq":0,"bobot":0.58,"tq":[null,null,null,2.5],"target":2.5,"real":1.38,"score":1,"ranges":[[0.0,1.49],[1.5,1.99],[2.0,2.49],[2.5,3.49],[3.5,4.49],[4.5,5.0]],"prov":"Hendy Risdianto Wijaya"},{"no":44,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.6.A.1.","name":"Percentage of FM have International Papers","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,null,95.0],"target":95.0,"real":95.0,"score":4,"ranges":[[0.0,84.99],[85.0,89.99],[90.0,94.99],[95.0,96.49],[96.5,97.99],[98.0,100.0]],"prov":"Brilly Andro Makalew"},{"no":45,"div":"Math","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.8.A.1.","name":"# proposal Program Kreativitas Mahasiswa","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":0.15,"tq":[null,null,null,null],"target":null,"real":null,"score":4,"ranges":[null,null,null,null,null,null],"prov":"Devyano Luhukay"},{"no":46,"div":"Math","p":"ENB","goal":"19. Knowledge Management (E1)","code":"","name":"Massive Open Online Course","unit":"Course","type":"Q","fokus":0,"prereq":0,"bobot":0.14,"tq":[null,null,null,1.0],"target":1.0,"real":1.2,"score":1,"ranges":[[0.0,0.0],null,null,[1.0,1.0],null,[2.0,100.0]],"prov":"Gredion Prajena"},{"no":47,"div":"Math","p":"ENB","goal":"19. Knowledge Management (E1)","code":"E1.2.A.1","name":"Video Based Learning (Video biasa)","unit":"Video","type":"Q","fokus":0,"prereq":0,"bobot":0.14,"tq":[6.0,12.0,18.0,25.0],"target":25.0,"real":27.0,"score":4,"ranges":[[0.0,12.0],[13.0,18.0],[19.0,24.0],[25.0,30.0],[31.0,37.0],[38.0,1000.0]],"prov":"Bonny A Suryawinata"},{"no":48,"div":"Math","p":"ENB","goal":"20. The Right People (E2)","code":"","name":"# FM JJA (Kenaikan JJA Non TP)","unit":"Dosen","type":"Q","fokus":0,"prereq":0,"bobot":0.29,"tq":[null,null,null,1.0],"target":1.0,"real":1.08,"score":6,"ranges":[[0.0,0.0],null,null,null,null,[1.0,100.0]],"prov":"Olifia Rombot"},{"no":49,"div":"Math","p":"ENB","goal":"20. The Right People (E2)","code":"E2.4.A.1.","name":"Lecturer Internship","unit":"Dosen","type":"Q","fokus":0,"prereq":0,"bobot":0.58,"tq":[null,null,null,1.0],"target":1.0,"real":0.9,"score":1,"ranges":[[0.0,0.0],null,null,[1.0,1.0],null,[2.0,100.0]],"prov":"Olifia Rombot"},{"no":1,"div":"Stat","p":"ECO","goal":"4. Student Numbers (Intake and Active Students) (G4)","code":"G4.1.A.1","name":"New Student Intake (Regular Program - Undergraduate)","unit":"Mahasiswa","type":"Q","fokus":1,"prereq":1,"bobot":0.46,"tq":[10.0,20.0,30.0,30.0],"target":30.0,"real":27.0,"score":3,"ranges":[[0.0,23.0],[24.0,26.0],[27.0,29.0],[30.0,34.0],[35.0,39.0],[40.0,100.0]],"prov":"Jodi Oktrianto Putro"},{"no":2,"div":"Stat","p":"ECO","goal":"4. Student Numbers (Intake and Active Students) (G4)","code":"G4.2.A.1","name":"Active Student Regular Program - Undergraduate) - Genap 2025/2026","unit":"Mahasiswa","type":"Q","fokus":1,"prereq":0,"bobot":0.25,"tq":[null,103.0,103.0,103.0],"target":103.0,"real":111.24,"score":6,"ranges":[[0.0,96.0],[97.0,99.0],[100.0,102.0],[103.0,104.0],[105.0,105.0],[106.0,999.0]],"prov":"Yovita Tunardi"},{"no":3,"div":"Stat","p":"ECO","goal":"4. Student Numbers (Intake and Active Students) (G4)","code":"G4.2.A.1","name":"Active Student Regular Program - Undergraduate) - Ganjil 2026/2027","unit":"Mahasiswa","type":"Q","fokus":1,"prereq":0,"bobot":0.25,"tq":[null,null,null,87.0],"target":87.0,"real":65.25,"score":1,"ranges":[[0.0,80.0],[81.0,83.0],[84.0,86.0],[87.0,87.0],[88.0,88.0],[89.0,199.0]],"prov":"Yovita Tunardi"},{"no":4,"div":"Stat","p":"ECO","goal":"5. Non Tuition Revenue (G5)","code":"G5.3.A.1","name":"Other revenue stream (research ) - Jurusan","unit":"Rupiah","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[37750000.0,75500000.0,113250000.0,151000000.0],"target":151000000.0,"real":135900000.0,"score":3,"ranges":[[0.0,97999999.99],[98000000.0,120999999.99],[121000000.0,150999999.99],[151000000.0,165999999.99],[166000000.0,180999999.99],[181000000.0,10000000000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":5,"div":"Stat","p":"REC","goal":"8. Global Employability (R2)","code":"R2.1.A.1","name":"Employment Rate (on graduation)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.13,"tq":[null,null,80.0,80.0],"target":80.0,"real":80.0,"score":4,"ranges":[[0.0,69.99],[70.0,74.99],[75.0,79.99],[80.0,84.99],[85.0,89.99],[90.0,100.0]],"prov":"Ratna Sari"},{"no":6,"div":"Stat","p":"REC","goal":"8. Global Employability (R2)","code":"R2.1.A.2.","name":"Employment Rate (6 mo after graduation)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.16,"tq":[85.0,85.0,85.0,85.0],"target":85.0,"real":85.0,"score":4,"ranges":[[0.0,74.99],[75.0,79.99],[80.0,84.99],[85.0,89.99],[90.0,94.99],[95.0,100.0]],"prov":"Ratna Sari"},{"no":7,"div":"Stat","p":"REC","goal":"8. Global Employability (R2)","code":"R2.2.A.1","name":"Global Employability (6 mo after graduation)","unit":"Persentase","type":"Q","fokus":1,"prereq":1,"bobot":0.86,"tq":[60.0,60.0,60.0,60.0],"target":60.0,"real":60.0,"score":4,"ranges":[[0.0,56.99],[57.0,58.49],[58.5,59.99],[60.0,61.49],[61.5,62.99],[63.0,100.0]],"prov":"Ratna Sari"},{"no":8,"div":"Stat","p":"REC","goal":"8. Global Employability (R2)","code":"R2.2.A.2","name":"Entrepreneur (6 mo after graduation)","unit":"Persentase","type":"Q","fokus":1,"prereq":0,"bobot":0.85,"tq":[20.0,20.0,20.0,20.0],"target":20.0,"real":11.0,"score":1,"ranges":[[0.0,17.99],[18.0,18.99],[19.0,19.99],[20.0,20.99],[21.0,21.99],[22.0,100.0]],"prov":"Ratna Sari"},{"no":9,"div":"Stat","p":"REC","goal":"8. Global Employability (R2)","code":"R2.4.A.1","name":"Graduates Certification (on Graduation)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.1,"tq":[null,80.0,80.0,80.0],"target":80.0,"real":80.0,"score":4,"ranges":[[0.0,59.99],[60.0,69.99],[70.0,79.99],[80.0,84.99],[85.0,89.99],[90.0,100.0]],"prov":"Veronica"},{"no":10,"div":"Stat","p":"REC","goal":"9. Global Recognition (R3)","code":"","name":"Akreditasi LAMSAMA","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":1.16,"tq":[null,null,null,null],"target":null,"real":null,"score":5,"ranges":[null,null,null,null,null,null],"prov":"Reggie Surya"},{"no":11,"div":"Stat","p":"REC","goal":"9. Global Recognition (R3)","code":"R3.7.A.1","name":"Students Competition","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":0.13,"tq":[null,null,null,null],"target":null,"real":null,"score":3,"ranges":[null,null,null,null,null,null],"prov":"Devyano Luhukay"},{"no":12,"div":"Stat","p":"REC","goal":"10. Academic Satisfaction & Stakeholder Satisfaction (R4)","code":"R4.1.A.1","name":"Academic Satisfaction","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.14,"tq":[null,80.0,80.0,80.0],"target":80.0,"real":60.0,"score":1,"ranges":[[0.0,65.99],[66.0,72.99],[73.0,79.99],[80.0,85.99],[86.0,90.99],[91.0,100.0]],"prov":"Cuk Tho"},{"no":13,"div":"Stat","p":"REC","goal":"10. Academic Satisfaction & Stakeholder Satisfaction (R4)","code":"R4.2.A.1","name":"Stakeholder Satisfaction","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.14,"tq":[null,null,null,80.0],"target":80.0,"real":72.0,"score":2,"ranges":[[0.0,65.99],[66.0,72.99],[73.0,79.99],[80.0,85.99],[86.0,90.99],[91.0,100.0]],"prov":"Cuk Tho"},{"no":14,"div":"Stat","p":"REC","goal":"11. Grants & Endowments (R5)","code":"R5.2.A.1","name":"Alumni Engagement","unit":"Rupiah","type":"Q","fokus":0,"prereq":0,"bobot":0.29,"tq":[2756750.0,5513500.0,8270250.0,11027000.0],"target":11027000.0,"real":13232400.0,"score":6,"ranges":[[0.0,8821599.99],[8821600.0,9924299.99],[9924300.0,11026999.99],[11027000.0,12129699.99],[12129700.0,13232399.99],[13232400.0,10000000000.0]],"prov":"Agus Edy Sutomo"},{"no":15,"div":"Stat","p":"REC","goal":"12. Empowering The Society (R6)","code":"R6.7.A.1","name":"Students Participations in Impactful  Empowering Society Activity","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.14,"tq":[null,null,74.0,74.0],"target":74.0,"real":74.0,"score":4,"ranges":[[0.0,59.99],[60.0,67.49],[67.5,73.99],[74.0,75.99],[76.0,77.99],[78.0,100.0]],"prov":"Andyni Khosasih"},{"no":16,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - Research","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,null,1.0,2.0],"target":2.0,"real":2.0,"score":4,"ranges":[[0.0,0.0],null,[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":17,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - ComDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[1.0,2.0,3.0,4.0],"target":4.0,"real":4.0,"score":4,"ranges":[[0.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,5.0],[6.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":18,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - SelfDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.04,"tq":[null,null,null,1.0],"target":1.0,"real":1.08,"score":1,"ranges":[[0.0,0.0],null,null,[1.0,1.0],[2.0,2.0],[3.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":19,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Local Universities Partnership - Teaching","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.02,"tq":[3.0,6.0,9.0,10.0],"target":10.0,"real":10.8,"score":4,"ranges":[[0.0,4.0],[5.0,7.0],[8.0,9.0],[10.0,1000.0],null,null],"prov":"Theodora Subyantoro"},{"no":20,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - Research","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":2.25,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":21,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - ComDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":1.65,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":22,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - SelfDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.04,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":2.7,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":23,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"International Partnership - Teaching","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.02,"tq":[4.0,8.0,12.0,15.0],"target":15.0,"real":13.5,"score":3,"ranges":[[0.0,6.0],[7.0,9.0],[10.0,14.0],[15.0,17.0],[18.0,100.0],null],"prov":"Theodora Subyantoro"},{"no":24,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - Research","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":2.25,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":25,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - SelfDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.04,"tq":[null,1.0,2.0,3.0],"target":3.0,"real":3.6,"score":1,"ranges":[[0.0,0.0],[1.0,1.0],[2.0,2.0],[3.0,3.0],[4.0,4.0],[5.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":26,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - ComDev","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.03,"tq":[1.0,2.0,3.0,5.0],"target":5.0,"real":5.4,"score":1,"ranges":[[0.0,1.0],[2.0,2.0],[3.0,4.0],[5.0,5.0],[6.0,6.0],[7.0,1000.0]],"prov":"Theodora Subyantoro"},{"no":27,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"","name":"Industry Partnership - Teaching","unit":"Kegiatan","type":"Q","fokus":0,"prereq":0,"bobot":0.02,"tq":[4.0,8.0,12.0,15.0],"target":15.0,"real":13.5,"score":3,"ranges":[[0.0,6.0],[7.0,10.0],[11.0,14.0],[15.0,100.0],null,null],"prov":"Theodora Subyantoro"},{"no":28,"div":"Stat","p":"CBE","goal":"13. Global Partnership (C1)","code":"C1.2.C.1","name":"International experience","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.07,"tq":[null,75.0,75.0,75.0],"target":75.0,"real":75.0,"score":6,"ranges":[[0.0,59.99],[60.0,64.99],[65.0,74.99],null,null,null],"prov":"Debby Sonita Lubis"},{"no":29,"div":"Stat","p":"CBE","goal":"14. Operational Excellence (C2)","code":"","name":"On time Internal Audit Findings being followed up by Units and Prodis","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,null,null],"target":null,"real":null,"score":4,"ranges":[null,null,null,null,null,null],"prov":"Cuk Tho"},{"no":30,"div":"Stat","p":"CBE","goal":"14. Operational Excellence (C2)","code":"","name":"Tingkat penyelesaian course di  Beelingua oleh B2028","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.12,"tq":[null,null,null,80.0],"target":80.0,"real":86.4,"score":4,"ranges":[[0.0,59.99],[60.0,69.99],[70.0,79.99],[80.0,89.99],[90.0,94.99],[95.0,100.0]],"prov":"Hendra Bakti"},{"no":31,"div":"Stat","p":"CBE","goal":"14. Operational Excellence (C2)","code":"C2.8.A.1.","name":"On Time Graduation - Undergraduate","unit":"Persentase","type":"Q","fokus":1,"prereq":1,"bobot":0.55,"tq":[null,null,65.0,65.0],"target":65.0,"real":65.0,"score":4,"ranges":[[0.0,49.99],[50.0,59.99],[60.0,64.99],[65.0,72.49],[72.5,79.99],[80.0,100.0]],"prov":"Lianna Sugandi"},{"no":32,"div":"Stat","p":"CBE","goal":"14. Operational Excellence (C2)","code":"C2.9.A.1.","name":"Percentage Max of NR Students - Ganjil","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.07,"tq":[null,15.0,15.0,15.0],"target":15.0,"real":11.25,"score":5,"ranges":[[20.01,100.0],[17.51,20.0],[15.01,17.5],[12.51,15.0],[10.0,12.5],[0.0,9.99]],"prov":"Ria Devita DJS"},{"no":33,"div":"Stat","p":"CBE","goal":"14. Operational Excellence (C2)","code":"C2.9.A.1.","name":"Percentage Max of NR Students - Genap","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.06,"tq":[null,null,15.0,15.0],"target":15.0,"real":11.25,"score":5,"ranges":[[20.01,100.0],[17.51,20.0],[15.01,17.5],[12.51,15.0],[10.0,12.5],[0.0,9.99]],"prov":"Ria Devita DJS"},{"no":34,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"","name":"MULTIDISICPLINARY RESEARCH OUTPUT (2 PER FACULTY/SCHOOL)","unit":"Research","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,1.0,2.0],"target":2.0,"real":2.0,"score":4,"ranges":[[0.0,0.99],null,[1.0,1.99],[2.0,2.99],[3.0,3.99],[4.0,10000.0]],"prov":"Brilly Andro Makalew"},{"no":35,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.A.1.","name":"# of SCOPUS Publication FM","unit":"Publikasi","type":"Q","fokus":1,"prereq":0,"bobot":2,"tq":[4.0,8.0,12.0,16.0],"target":16.0,"real":16.0,"score":4,"ranges":[[0.0,10.99],[11.0,12.99],[13.0,15.99],[16.0,17.99],[18.0,19.99],[20.0,10000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":36,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.A.2.","name":"# of SCOPUS Publication MHS","unit":"Publikasi","type":"Q","fokus":1,"prereq":0,"bobot":1.2,"tq":[3.0,6.0,9.0,10.0],"target":10.0,"real":10.0,"score":4,"ranges":[[0.0,6.99],[7.0,7.99],[8.0,9.99],[10.0,10.99],[11.0,11.99],[12.0,10000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":37,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.B.1.","name":"New Citation","unit":"New Citation","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[11.0,22.0,33.0,45.0],"target":45.0,"real":40.5,"score":3,"ranges":[[0.0,29.99],[30.0,35.99],[36.0,44.99],[45.0,49.99],[50.0,53.99],[54.0,10000.0]],"prov":"Brilly Andro Makalew"},{"no":38,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.1.B.2.","name":"New Citation (External)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[75.0,75.0,75.0,75.0],"target":75.0,"real":75.0,"score":4,"ranges":[[0.0,52.99],[53.0,64.99],[65.0,74.99],[75.0,82.99],[83.0,89.99],[90.0,100.0]],"prov":"Brilly Andro Makalew"},{"no":39,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.3.A.1.","name":"Research Program","unit":"Poin","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[1.0,2.0,4.0,5.0],"target":5.0,"real":4.5,"score":3,"ranges":[[0.0,2.99],[3.0,3.99],[4.0,4.99],[5.0,5.99],[6.0,6.99],[7.0,10000.0]],"prov":"Ridhwan Bugiansyah Rasid"},{"no":40,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.3.A.2.","name":"Research Program (International)","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,null,60.0],"target":60.0,"real":72.0,"score":4,"ranges":[[0.0,29.99],[30.0,44.99],[45.0,59.99],[60.0,74.99],[75.0,89.99],[90.0,100.0]],"prov":"Brilly Andro Makalew"},{"no":41,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.4.A.1.","name":"# of new IP(s)","unit":"IP","type":"Q","fokus":0,"prereq":0,"bobot":0.2,"tq":[null,null,1.0,2.0],"target":2.0,"real":1.5,"score":3,"ranges":[null,null,[1.0,1.99],null,[3.0,3.99],null],"prov":"Hendy Risdianto Wijaya"},{"no":42,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.6.A.1.","name":"Percentage of FM have International Papers","unit":"Persentase","type":"Q","fokus":0,"prereq":0,"bobot":0.38,"tq":[null,null,null,95.0],"target":95.0,"real":95.0,"score":4,"ranges":[[0.0,84.99],[85.0,89.99],[90.0,94.99],[95.0,96.49],[96.5,97.99],[98.0,100.0]],"prov":"Brilly Andro Makalew"},{"no":43,"div":"Stat","p":"CBE","goal":"17. Research and IP (C5)","code":"C5.8.A.1.","name":"# proposal Program Kreativitas Mahasiswa","unit":"Score","type":"L","fokus":0,"prereq":0,"bobot":0.15,"tq":[null,null,null,null],"target":null,"real":null,"score":2,"ranges":[null,null,null,null,null,null],"prov":"Devyano Luhukay"},{"no":44,"div":"Stat","p":"ENB","goal":"19. Knowledge Management (E1)","code":"","name":"Massive Open Online Course","unit":"Course","type":"Q","fokus":0,"prereq":0,"bobot":0.14,"tq":[null,null,null,1.0],"target":1.0,"real":1.08,"score":1,"ranges":[[0.0,0.0],null,null,[1.0,1.0],null,[2.0,100.0]],"prov":"Gredion Prajena"},{"no":45,"div":"Stat","p":"ENB","goal":"19. Knowledge Management (E1)","code":"E1.2.A.1","name":"Video Based Learning (Video biasa)","unit":"Video","type":"Q","fokus":0,"prereq":0,"bobot":0.14,"tq":[3.0,6.0,9.0,12.0],"target":12.0,"real":9.0,"score":3,"ranges":[[0.0,3.0],[4.0,8.0],[9.0,11.0],[12.0,19.0],[20.0,25.0],[26.0,1000.0]],"prov":"Bonny A Suryawinata"},{"no":46,"div":"Stat","p":"ENB","goal":"20. The Right People (E2)","code":"","name":"# FM JJA (Kenaikan JJA TP ke AA)","unit":"Dosen","type":"Q","fokus":0,"prereq":0,"bobot":0.23,"tq":[null,null,null,1.0],"target":1.0,"real":0.75,"score":1,"ranges":[[0.0,0.0],null,null,[1.0,1.0],null,[2.0,100.0]],"prov":"Olifia Rombot"}];const LIGHT = {
+  bgPage:"#dcdcdd", gradHero:"linear-gradient(158deg,#0d90d8 0%,#1f8ccd 22%,#4a6cc0 52%,#7a4fb2 78%,#a13ba5 100%)",
+  gradMast:"linear-gradient(122deg,#0d90d8 0%,#2b83c9 38%,#6a58b8 74%,#9c3fa9 100%)",
+  gradKpi:"linear-gradient(135deg,#0d90d8 0%,#3f76c2 55%,#8a48ad 100%)",
+  panel:"#ffffff", panelAlt:"#f4f4f4", panelRow:"#eeeeee", pageBg:"#eceded", cardBg:"#efefef", inputBg:"#dcdcdc",
+  ink:"#111111", inkStrong:"#1a1a1a", ink2:"#3d3d3d", inkMuted:"#5c5c5c", inkFaint:"#6b6b6b",
+  orange:"#ee8b0a", orangeH:"#d87c05", blue:"#1a8fd6", blueDeep:"#0d6ea8", link:"#0a84d8",
+  okBg:"#dcf0e5", okFg:"#146b43", okDot:"#1e8e5a", warnBg:"#fdf3e3", warnFg:"#8a5600", warnFgS:"#6b4400", warnChip:"#fbe1b4", danger:"#d22118",
+  bSoft:"rgba(0,0,0,.12)", bFaint:"rgba(0,0,0,.08)", shCard:"0 10px 32px rgba(0,0,0,.15)", shPop:"0 18px 50px rgba(0,0,0,.18)",
+};const DARK = {
+  bgPage:"#0b0c0e", gradHero:"linear-gradient(158deg,#062f4d 0%,#0b3a5c 22%,#1d3470 52%,#3a1f63 78%,#4c1352 100%)",
+  gradMast:"linear-gradient(122deg,#062f4d 0%,#0d3a5f 38%,#2a2a6d 74%,#4c1352 100%)",
+  gradKpi:"linear-gradient(135deg,#0b3a5c 0%,#22326e 55%,#4c1352 100%)",
+  panel:"#1b1d22", panelAlt:"#22252b", panelRow:"#191b20", pageBg:"#101216", cardBg:"#1b1d22", inputBg:"#2a2d33",
+  ink:"#f7f7f8", inkStrong:"#f2f2f3", ink2:"rgba(242,242,243,.8)", inkMuted:"rgba(242,242,243,.6)", inkFaint:"rgba(242,242,243,.5)",
+  orange:"#f5960f", orangeH:"#ffa726", blue:"#3aa5e6", blueDeep:"#7cc4ec", link:"#5cb8ee",
+  okBg:"rgba(47,177,115,.2)", okFg:"#6fd6a2", okDot:"#2fb173", warnBg:"rgba(245,150,15,.12)", warnFg:"#ffb545", warnFgS:"#ffcf94", warnChip:"rgba(255,181,69,.22)", danger:"#e5453c",
+  bSoft:"rgba(255,255,255,.12)", bFaint:"rgba(255,255,255,.08)", shCard:"0 10px 32px rgba(0,0,0,.45)", shPop:"0 18px 50px rgba(0,0,0,.45)",
+};const FONT_UI = "'Segoe UI','Source Sans 3',system-ui,-apple-system,sans-serif";const idr = (n) => n==null? "—" : (Math.abs(n)>=1e6 ? (n/1e6).toLocaleString("id-ID",{maximumFractionDigits:1})+" jt" : n.toLocaleString("id-ID",{maximumFractionDigits:2}));
+const MONTHS = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+function bandLabel(i){ return i<=0?"Merah (kritis)": i<=2?"Kuning (perhatian)":"Hijau (tercapai)"; }
+
+/* ============================================================
+   HELPER API + FILE PARSER (untuk CRUD & Upload ke backend)
+   ============================================================ */
+var API = (typeof window!=="undefined" && window.__API_BASE) ? window.__API_BASE : "http://localhost:5000";
+var THN = (typeof window!=="undefined" && window.__TAHUN) ? window.__TAHUN : 2026;
+
+async function apiFetch(pathname, opts){
+  var url = API + pathname;
+  var res = await fetch(url, Object.assign({
+    headers: { "Content-Type": "application/json" }
+  }, opts||{}));
+  var body = null;
+  try { body = await res.json(); } catch(e){ body = null; }
+  if (!res.ok) {
+    var msg = (body && body.error) ? body.error : ("HTTP "+res.status);
+    throw new Error(msg);
+  }
+  return body;
+}
+
+// Baca file (xlsx/csv) -> array of objects (header baris pertama).
+function readSheetFile(file){
+  return new Promise(function(resolve, reject){
+    if (typeof XLSX === "undefined") { reject(new Error("Library Excel belum termuat.")); return; }
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, { type:"array" });
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws, { defval:null });
+        resolve(rows);
+      } catch(err){ reject(err); }
+    };
+    reader.onerror = function(){ reject(new Error("Gagal membaca file.")); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Normalisasi 1 baris sheet -> payload KPI backend. Header fleksibel
+// (dibuat cocok dengan hasil Download: No, Kode, Indikator, Perspektif,
+//  Satuan, Realisasi, Target, Bobot, PIC, Divisi/Div).
+function rowToKpiPayload(row, fallbackDiv){
+  function g(){ for (var i=0;i<arguments.length;i++){ var k=arguments[i]; if (row[k]!==undefined && row[k]!==null && row[k]!=="") return row[k]; } return null; }
+  var perspRaw = g("Perspektif","perspektif","p","P");
+  var pMap = { "capacity building":"CBE","capacity building and execution":"CBE","enabler":"ENB","economic growth":"ECO","recognition":"REC","cbe":"CBE","enb":"ENB","eco":"ECO","rec":"REC" };
+  var p = perspRaw ? (pMap[String(perspRaw).toLowerCase().trim()] || String(perspRaw).toUpperCase()) : "CBE";
+  var divRaw = g("Divisi","Div","div","prodi","Prodi");
+  var div = fallbackDiv || "Math";
+  if (divRaw){ var d=String(divRaw).toLowerCase(); div = (d.indexOf("stat")>=0)?"Stat":"Math"; }
+  var typeRaw = g("Tipe","type","Type");
+  var type = typeRaw ? (String(typeRaw).toUpperCase().indexOf("L")===0 || String(typeRaw).toLowerCase().indexOf("qualit")>=0 ? "L":"Q") : "Q";
+  return {
+    div: div, p: p,
+    goal: g("Goal","goal","Tujuan"),
+    code: g("Kode","code","Kode PI","kode_pi") || "",
+    name: g("Indikator","name","Nama Indikator","indikator"),
+    unit: g("Satuan","unit") || "",
+    type: type,
+    fokus: 0, prereq: 0,
+    bobot: g("Bobot","bobot"),
+    target: g("Target","target","target_all"),
+    real: g("Realisasi","real","nilai","Nilai"),
+    no: g("No","no","no_urut") || 0
+  };
+}
+
+function rowToAkunPayload(row){
+  function g(){ for (var i=0;i<arguments.length;i++){ var k=arguments[i]; if (row[k]!==undefined && row[k]!==null && row[k]!=="") return row[k]; } return null; }
+  return {
+    username: g("username","Username","email","Email"),
+    name: g("name","Nama","nama","Nama Lengkap") || g("username","Username","email","Email"),
+    role: (String(g("role","Role")||"viewer").toLowerCase()==="admin") ? "admin":"viewer",
+    nidn: g("nidn","NIDN") || "",
+    password: g("password","Password") || ""
+  };
+}
+
+function downloadKpiXlsx(r, divName, onToast){
+  if (typeof XLSX === "undefined") { onToast && onToast("Library Excel belum termuat, coba lagi sebentar."); return; }
+  try {
+    // Sheet 1: ringkasan KPI
+    const info = [
+      ["Prodi", divName],
+      ["Kode PI", r.code || "—"],
+      ["Indikator", r.name],
+      ["Perspektif", (PERSP_META[r.p]||{}).label || r.p],
+      ["Goal", r.goal || "—"],
+      ["Satuan", r.unit],
+      ["Bobot", r.bobot],
+      ["PIC", r.prov || "—"],
+      [],
+      ["Realisasi", r.type==="L"? "—" : r.real],
+      ["Target", r.target],
+      ["% ke target", (r.real!=null && r.target)? Math.round(r.real/r.target*100)+"%" : "—"],
+      ["Skor capaian", r.score==null? "—" : r.score+" / 6"],
+      ["Status", r.score==null? "—" : bandLabel(scoreBand(r.score)==="red"?0:scoreBand(r.score)==="orange"?1:3)],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(info);
+    ws1["!cols"] = [{wch:16},{wch:52}];
+
+    // Sheet 2: rentang skor (band) 1-6
+    const bandRows = [["Skor","Rentang Min","Rentang Max","Status","Aktual?"]];
+    (r.ranges||[]).forEach((pair,i)=>{
+      bandRows.push([ i+1, pair? pair[0]:"", pair? pair[1]:"", bandLabel(i), (i+1)===r.score? "◀ realisasi di sini":"" ]);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(bandRows);
+    ws2["!cols"] = [{wch:6},{wch:16},{wch:16},{wch:20},{wch:20}];
+
+    // Sheet 3: realisasi per bulan (kalau ada; prototipe pakai target kuartal sbg placeholder)
+    const monthRows = [["Bulan","Realisasi (kumulatif)"]];
+    // prototipe: kita hanya punya realisasi akhir; isi bulan terakhir saja
+    MONTHS.forEach((m,i)=>{ monthRows.push([m, i===5 && r.type!=="L"? r.real : ""]); }); // Jun = periode data
+    const ws3 = XLSX.utils.aoa_to_sheet(monthRows);
+    ws3["!cols"] = [{wch:8},{wch:22}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, "Ringkasan");
+    XLSX.utils.book_append_sheet(wb, ws2, "Rentang Skor");
+    XLSX.utils.book_append_sheet(wb, ws3, "Realisasi Bulanan");
+
+    const safe = (r.code||r.name).replace(/[^a-zA-Z0-9]+/g,"_").slice(0,40);
+    XLSX.writeFile(wb, `KPI_${divName}_${safe}.xlsx`);
+    onToast && onToast("File Excel diunduh: "+safe+".xlsx");
+  } catch(e){
+    onToast && onToast("Gagal membuat file Excel.");
+  }
+}function downloadAllKpiXlsx(rowsList, divName, onToast){
+  if (typeof XLSX === "undefined") { onToast && onToast("Library Excel belum termuat, coba lagi sebentar."); return; }
+  try {
+    const header = ["No","Kode","Indikator","Perspektif","Satuan","Realisasi","Target","% Target","Skor","Status","Bobot","PIC"];
+    const aoa = [header];
+    rowsList.forEach((r,i)=>{
+      aoa.push([
+        i+1, r.code||"—", r.name, (PERSP_META[r.p]||{}).short||r.p, r.unit,
+        r.type==="L"? "—" : r.real, r.target,
+        (r.real!=null && r.target)? Math.round(r.real/r.target*100)+"%" : "—",
+        r.score==null? "—" : r.score+"/6",
+        r.score==null? "—" : bandLabel(scoreBand(r.score)==="red"?0:scoreBand(r.score)==="orange"?1:3),
+        r.bobot, r.prov||"—"
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{wch:5},{wch:11},{wch:46},{wch:12},{wch:11},{wch:12},{wch:12},{wch:9},{wch:7},{wch:18},{wch:8},{wch:22}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rekap KPI Dashboard");
+    XLSX.writeFile(wb, `Rekap_KPI_${divName}.xlsx`);
+    onToast && onToast("Rekap "+rowsList.length+" KPI diunduh.");
+  } catch(e){ onToast && onToast("Gagal membuat file Excel."); }
+}function Icon({ d, size = 17 }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
+}const SunIcon = <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>;const MoonIcon = <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>;function ThemeToggle({ theme, setTheme, t }) {
+  const btn = (mode, icon, label) => (
+    <button aria-label={label} onClick={() => setTheme(mode)} style={{
+      border:0, background: theme===mode? "#fff" : "transparent", color: theme===mode? t.blueDeep : "rgba(255,255,255,.85)",
+      borderRadius:999, width:28, height:28, display:"grid", placeItems:"center", cursor:"pointer", transition:"all .15s",
+    }}><Icon d={icon} size={14} /></button>
+  );
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:4,
+      padding:4, borderRadius:999, background:"rgba(255,255,255,.16)" }}>
+      {btn("light", SunIcon, "Mode terang")}
+      {btn("dark", MoonIcon, "Mode gelap")}
+    </div>
+  );
+}function Panel({ children, style }) {
+  return <div style={{ borderRadius:16, background:"var(--panel)", padding:20, ...style }}>{children}</div>;
+}function PanelHead({ eyebrow, title, hint, right, legend }) {
+  return (
+    <div style={{ display:"flex", alignItems:"flex-start", gap:10, flexWrap:"wrap" }}>
+      <div>
+        <div style={{ fontSize:12, fontWeight:700, letterSpacing:".06em", color:"var(--inkMuted)" }}>{eyebrow}</div>
+        <div style={{ fontSize:20, fontWeight:700, lineHeight:1.25, letterSpacing:"-.012em", marginTop:3, color:"var(--ink)" }}>{title}</div>
+        {hint && <div style={{ fontSize:12, color:"var(--inkMuted)", marginTop:2 }}>{hint}</div>}
+        {legend && <div style={{ display:"flex", gap:16, marginTop:9, fontSize:12.5, color:"var(--ink2)", flexWrap:"wrap" }}>{legend}</div>}
+      </div>
+      {right && <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:8, flex:"none" }}>{right}</div>}
+    </div>
+  );
+}function VarChip({ children, warn }) {
+  return <span style={{ padding:"7px 11px", borderRadius:999, fontSize:11, fontWeight:700, letterSpacing:".04em",
+    background: warn? "var(--warnChip)":"var(--okBg)", color: warn? "var(--warnFg)":"var(--blueDeep)", whiteSpace:"nowrap" }}>{children}</span>;
+}function ViewToggle({ onTable }) {
+  const [active, setActive] = useState("Grafik");
+  return (
+    <div style={{ display:"flex", gap:3, padding:3, borderRadius:9, background:"var(--inputBg)" }}>
+      {["Grafik","Tabel"].map((l) => (
+        <button key={l} onClick={() => { setActive(l); if(l==="Tabel") onTable && onTable(); }} style={{
+          padding:"7px 13px", borderRadius:7, fontSize:12, fontWeight: active===l?700:600, lineHeight:1, border:0,
+          background: active===l? "var(--panel)":"none", color: active===l? "var(--ink)":"var(--inkMuted)", cursor:"pointer", fontFamily:FONT_UI,
+        }}>{l}</button>
+      ))}
+    </div>
+  );
+}function FilterChip({ label, on, toggleable, onToast }) {
+  const [state, setState] = useState(on);
+  return (
+    <button onClick={() => toggleable ? setState(s=>!s) : onToast && onToast(label)} style={{
+      display:"flex", alignItems:"center", gap:9, height:40, padding:"0 15px", borderRadius:9,
+      background: state? "var(--blue)":"var(--inputBg)", color: state? "#fff":"var(--ink)",
+      fontSize:12.5, fontWeight:600, border:0, cursor:"pointer", fontFamily:FONT_UI,
+    }}>{label}{toggleable? <span style={{opacity:.75}}>×</span> : <span style={{color:"var(--inkMuted)"}}>▾</span>}</button>
+  );
+}function SyncPill({ children, dead }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:11.5, fontWeight:600, letterSpacing:".06em", color:"var(--inkMuted)" }}>
+      <span style={{ width:7, height:7, borderRadius:999, background: dead? "var(--inkFaint)":"var(--okDot)",
+        animation: dead? "none":"pm-pulse 2.4s ease-in-out infinite", flex:"none" }} />
+      {children}
+    </div>
+  );
+}function ContentHead({ sync, syncDead, title, children }) {
+  return (
+    <div style={{ display:"flex", alignItems:"flex-end", gap:16, flexWrap:"wrap" }}>
+      <div>
+        <SyncPill dead={syncDead}>{sync}</SyncPill>
+        <h1 style={{ margin:"8px 0 0", fontSize:32, fontWeight:700, lineHeight:1.1, letterSpacing:"-.018em", color:"var(--ink)" }}>{title}</h1>
+      </div>
+      {children && <div style={{ marginLeft:"auto", display:"flex", gap:8, flexWrap:"wrap", justifyContent:"flex-end" }}>{children}</div>}
+    </div>
+  );
+}function StatusPill({ kind, children }) {
+  const map = {
+    active:{ bg:"var(--okBg)", fg:"var(--okFg)" },
+    leave:{ bg:"var(--warnChip)", fg:"var(--warnFgS)" },
+    grad:{ bg:"var(--panelRow)", fg:"var(--inkMuted)" },
+  };
+  const s = map[kind] || map.grad;
+  return <span style={{ padding:"5px 10px", borderRadius:7, fontSize:11.5, fontWeight:700, lineHeight:1, display:"inline-block", background:s.bg, color:s.fg }}>{children}</span>;
+}function StatCard({ label, num, foot }) {
+  return (
+    <div style={{ borderRadius:16, background:"var(--panel)", padding:19, display:"flex", flexDirection:"column" }}>
+      <div style={{ fontSize:12, color:"var(--inkMuted)" }}>{label}</div>
+      <div style={{ fontSize:44, fontWeight:700, lineHeight:1, letterSpacing:"-.025em", marginTop:5, color:"var(--ink)" }}>{num}</div>
+      <div style={{ marginTop:"auto", paddingTop:14, fontSize:12.5, lineHeight:1.5, color:"var(--ink2)" }}>{foot}</div>
+    </div>
+  );
+}const exportBtn = { marginLeft:"auto", height:40, display:"flex", alignItems:"center", padding:"0 16px", borderRadius:9, background:"var(--inputBg)", fontSize:12.5, fontWeight:600, color:"var(--ink)", border:0, cursor:"pointer", fontFamily:FONT_UI };const SLOT_COUNT = 8;const PERSP_META = {
+  CBE:{label:"Capacity Building & Execution", short:"Capacity", color:"var(--blueDeep)"},
+  ENB:{label:"Enabler", short:"Enabler", color:"var(--blue)"},
+  ECO:{label:"Economic Growth", short:"Economic", color:"var(--okDot)"},
+  REC:{label:"Recognition", short:"Recognition", color:"var(--orange)"},
+};const PERSP_ORDER = ["ECO","REC","CBE","ENB"];function scoreBand(s){ if(s==null) return "none"; if(s<=1) return "red"; if(s<=3) return "orange"; return "green"; }const BANDC = {
+  red:{dot:"var(--danger)", fg:"var(--danger)", bg:"var(--warnBg)"},
+  orange:{dot:"var(--orange)", fg:"var(--warnFgS)", bg:"var(--warnBg)"},
+  green:{dot:"var(--okDot)", fg:"var(--okFg)", bg:"var(--okBg)"},
+  none:{dot:"var(--inputBg)", fg:"var(--inkMuted)", bg:"var(--panelAlt)"},
+};function defaultSlots(rows){
+  const fokus = rows.map((r,i)=>({r,i})).filter(x=>x.r.fokus).map(x=>x.i);
+  const rest  = rows.map((r,i)=>({r,i})).filter(x=>!x.r.fokus)
+                  .sort((a,b)=>(b.r.bobot||0)-(a.r.bobot||0)).map(x=>x.i);
+  const chosen = [...fokus, ...rest].slice(0, SLOT_COUNT);
+  const arr = new Array(SLOT_COUNT).fill(null);
+  chosen.forEach((idx,s)=> arr[s]=idx);
+  return arr;
+}function ScoreDot({ score, big }) {
+  const b = BANDC[scoreBand(score)];
+  return <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", minWidth:big?42:34, padding:big?"4px 10px":"3px 8px", borderRadius:6, background:b.bg, color:b.fg, fontWeight:700, fontSize:big?13:12 }}>{score==null?"—":`${score}/6`}</span>;
+}function fmtRange(pair, unit){
+  if(!pair) return "—";
+  const [a,b]=pair;
+  return `${idr(a)} – ${idr(b)}`;
+}
+function ScoreBandBreakdown({ r }) {
+  // r.ranges = 6 band [min,max] utk skor 1..6. Highlight band = skor aktual.
+  const bands = r.ranges || [];
+  const hasBands = bands.some(v=>v!=null);
+  if(!hasBands){
+    return <div style={{ padding:"14px 16px", borderRadius:10, background:"var(--panelAlt)", fontSize:12.5, color:"var(--inkMuted)", lineHeight:1.6 }}>
+      KPI kualitatif — skor ditentukan lewat penilaian deskriptif (rubrik), bukan rentang angka. Skor tercatat: <b style={{color:"var(--ink)"}}>{r.score==null?"—":`${r.score}/6`}</b>.
+    </div>;
+  }
+  const bandColor = (i)=> i<=0?"var(--danger)": i<=2?"var(--orange)":"var(--okDot)";
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"46px 1fr 70px", gap:10, padding:"0 12px 4px", fontSize:10.5, fontWeight:700, letterSpacing:".05em", color:"var(--inkFaint)" }}>
+        <span>SKOR</span><span>RENTANG REALISASI ({r.unit})</span><span style={{textAlign:"right"}}>STATUS</span>
+      </div>
+      {bands.map((pair,i)=>{
+        const active = (i+1)===r.score;
+        const c = bandColor(i);
+        return (
+          <div key={i} style={{ display:"grid", gridTemplateColumns:"46px 1fr 70px", gap:10, alignItems:"center",
+            padding:"10px 12px", borderRadius:9, fontSize:12.5,
+            background: active? "var(--panelAlt)":"transparent",
+            border: active? `1.5px solid ${c}` : "1.5px solid transparent",
+            color:"var(--ink)" }}>
+            <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:30, height:26, borderRadius:6, fontWeight:800, fontSize:13, background:c, color:"#fff" }}>{i+1}</span>
+            <span style={{ color: pair? "var(--ink)":"var(--inkFaint)", fontWeight: active?700:500 }}>{pair? fmtRange(pair, r.unit) : "tidak dipakai"}</span>
+            <span style={{ textAlign:"right" }}>{active? <span style={{ fontSize:10.5, fontWeight:800, letterSpacing:".04em", color:c }}>◀ AKTUAL</span> : ""}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+function KpiDetailModal({ r, onClose, divName, onToast }) {
+  useEffect(()=>{
+    const onEsc=(e)=>{ if(e.key==="Escape") onClose(); };
+    document.addEventListener("keydown", onEsc);
+    return ()=>document.removeEventListener("keydown", onEsc);
+  },[onClose]);
+  if(!r) return null;
+  const P = PERSP_META[r.p];
+  const b = BANDC[scoreBand(r.score)];
+  const pctToTarget = (r.real!=null && r.target) ? Math.round(r.real/r.target*100) : null;
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:1200, background:"rgba(0,0,0,.5)", display:"grid", placeItems:"center", padding:20 }}>
+      <div onClick={(e)=>e.stopPropagation()} className="pm-root" style={{ width:"min(560px,100%)", maxHeight:"88vh", overflowY:"auto", background:"var(--panel)", borderRadius:18, boxShadow:"0 24px 70px rgba(0,0,0,.4)", padding:24 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12 }}>
+          <div>
+            <span style={{ fontSize:10.5, fontWeight:700, letterSpacing:".05em", color:P.color }}>{P.short.toUpperCase()} · {r.code||"—"}</span>
+            <div style={{ fontSize:17, fontWeight:700, lineHeight:1.3, color:"var(--ink)", marginTop:5 }}>{r.name}</div>
+          </div>
+          <button onClick={onClose} aria-label="Tutup" style={{ flex:"none", width:32, height:32, borderRadius:8, border:0, cursor:"pointer", background:"var(--inputBg)", color:"var(--ink)", fontSize:16 }}>×</button>
+        </div>
+
+        {/* realisasi vs target + skor besar */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:18 }}>
+          <div style={{ padding:"14px 16px", borderRadius:12, background:"var(--panelAlt)" }}>
+            <div style={{ fontSize:11, color:"var(--inkMuted)" }}>Realisasi / Target</div>
+            <div style={{ display:"flex", alignItems:"baseline", gap:6, marginTop:6 }}>
+              <span style={{ fontSize:26, fontWeight:700, letterSpacing:"-.02em", color:"var(--ink)" }}>{r.type==="L"?"—":idr(r.real)}</span>
+              <span style={{ fontSize:13, color:"var(--inkMuted)" }}>/ {idr(r.target)}</span>
+            </div>
+            <div style={{ fontSize:11, color:"var(--inkFaint)", marginTop:2 }}>{r.unit}{pctToTarget!=null? ` · ${pctToTarget}% target`:""}</div>
+          </div>
+          <div style={{ padding:"14px 16px", borderRadius:12, background:b.bg, display:"flex", flexDirection:"column", justifyContent:"center" }}>
+            <div style={{ fontSize:11, color:b.fg, fontWeight:600 }}>Skor capaian</div>
+            <div style={{ fontSize:30, fontWeight:800, color:b.fg, letterSpacing:"-.02em", marginTop:4 }}>{r.score==null?"—":`${r.score}`}<span style={{ fontSize:16, fontWeight:700 }}> / 6</span></div>
+          </div>
+        </div>
+
+        {/* penjelasan cara hitung — inti pain point */}
+        <div style={{ marginTop:18, marginBottom:12 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:"var(--ink)" }}>Cara skor dihitung</div>
+          <p style={{ fontSize:12, lineHeight:1.6, color:"var(--inkMuted)", margin:"5px 0 14px" }}>
+            Skor 1–6 ditentukan dari <b style={{color:"var(--ink2)"}}>rentang (band)</b> tempat realisasi jatuh. {r.type!=="L" && r.score!=null && r.ranges && r.ranges[r.score-1] ? <>Realisasi <b style={{color:"var(--ink)"}}>{idr(r.real)} {r.unit}</b> masuk band ke-{r.score} ({fmtRange(r.ranges[r.score-1], r.unit)}), sehingga skornya <b style={{color:"var(--ink)"}}>{r.score}/6</b>.</> : "Rincian band di bawah."}
+          </p>
+          <ScoreBandBreakdown r={r} />
+        </div>
+
+        <div style={{ marginTop:8, padding:"11px 13px", borderRadius:10, background:"var(--panelAlt)", fontSize:11.5, color:"var(--inkMuted)", lineHeight:1.55 }}>
+          Bobot KPI: <b style={{color:"var(--ink2)"}}>{r.bobot}</b> · PIC: {r.prov || "—"}
+        </div>
+
+        <button onClick={()=>downloadKpiXlsx(r, divName||"Prodi", onToast)}
+          style={{ marginTop:14, height:44, width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:9,
+            borderRadius:10, border:0, cursor:"pointer", background:"var(--orange)", color:"#15161a", fontFamily:FONT_UI, fontSize:14, fontWeight:700 }}
+          onMouseEnter={(e)=>e.currentTarget.style.filter="brightness(.94)"} onMouseLeave={(e)=>e.currentTarget.style.filter="none"}>
+          <Icon d={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></>} size={17} />
+          Download data KPI ini (.xlsx)
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}function KpiCard({ r, slotNo, onOpen, divName, onToast }) {
+  const band = scoreBand(r.score);
+  const b = BANDC[band];
+  const P = PERSP_META[r.p];
+  const pctToTarget = (r.real!=null && r.target) ? Math.round(r.real/r.target*100) : null;
+  return (
+    <div onClick={()=>onOpen&&onOpen(r)} title="Klik untuk lihat rincian skor 1–6"
+      style={{ borderRadius:16, background:"var(--panel)", padding:18, borderTop:`3px solid ${P.color}`, display:"flex", flexDirection:"column", minHeight:210, cursor:"pointer", transition:"transform .12s, box-shadow .12s" }}
+      onMouseEnter={(e)=>{ e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,.12)"; e.currentTarget.style.transform="translateY(-2px)"; }}
+      onMouseLeave={(e)=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.transform="none"; }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+        <span style={{ fontSize:10.5, fontWeight:700, letterSpacing:".05em", color:P.color }}>{P.short.toUpperCase()}</span>
+        <span style={{ fontSize:10, color:"var(--inkFaint)" }}>SLOT {slotNo}</span>
+      </div>
+      <div style={{ fontSize:13, fontWeight:700, lineHeight:1.32, color:"var(--ink)", marginTop:8, minHeight:50 }}>{r.name}</div>
+      <div style={{ display:"flex", alignItems:"baseline", gap:6, marginTop:"auto" }}>
+        <span style={{ fontSize:30, fontWeight:700, letterSpacing:"-.02em", color:"var(--ink)" }}>{r.type==="L"?"—":idr(r.real)}</span>
+        <span style={{ fontSize:13, color:"var(--inkMuted)" }}>/ {idr(r.target)}</span>
+        <span style={{ fontSize:11, color:"var(--inkFaint)" }}>{r.unit}</span>
+      </div>
+      {pctToTarget!=null && (
+        <div style={{ height:6, borderRadius:3, background:"var(--panelRow)", overflow:"hidden", margin:"9px 0 0" }}>
+          <div style={{ height:6, width:`${Math.min(100,pctToTarget)}%`, background:b.dot }} />
+        </div>
+      )}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:9 }}>
+        <ScoreDot score={r.score} />
+        <span style={{ fontSize:11, color:"var(--inkMuted)" }}>{pctToTarget!=null? `${pctToTarget}% target` : "Kualitatif"}</span>
+      </div>
+      <button onClick={(e)=>{ e.stopPropagation(); downloadKpiXlsx(r, divName, onToast); }}
+        title="Download data KPI ini (.xlsx)"
+        style={{ marginTop:11, height:34, display:"flex", alignItems:"center", justifyContent:"center", gap:7, width:"100%",
+          borderRadius:8, border:0, cursor:"pointer", background:"var(--orange)", color:"#15161a", fontFamily:FONT_UI, fontSize:12, fontWeight:700 }}
+        onMouseEnter={(e)=>e.currentTarget.style.filter="brightness(.94)"} onMouseLeave={(e)=>e.currentTarget.style.filter="none"}>
+        <Icon d={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></>} size={15} />
+        Download
+      </button>
+    </div>
+  );
+}function KpiDashboard({ div, rows, slots, onToast, role, onUpload }) {
+  const isAdmin = role==="admin";
+  const [detail, setDetail] = useState(null);
+  const filled = slots.map((idx,s)=> idx==null? null : {r:rows[idx], slotNo:s+1}).filter(Boolean);
+  // summary across the FILLED slots (the real complaint dosen had: no summary)
+  const scored = filled.filter(x=>x.r.score!=null);
+  const green = scored.filter(x=>scoreBand(x.r.score)==="green").length;
+  let wSum=0,wScore=0; scored.forEach(x=>{ wSum+=(x.r.bobot||0); wScore+=x.r.score*(x.r.bobot||0); });
+  const weighted = wSum? (wScore/wSum):null;
+
+  // --- data for the middle wide chart: score per filled slot (bar chart) ---
+  const chartData = filled.map(x=>({ label:`S${x.slotNo}`, score:x.r.score, name:x.r.name, p:x.r.p }));
+  // --- bottom-left: score distribution across filled slots ---
+  const dist = { green, orange:0, red:0, none:filled.length-scored.length };
+  scored.forEach(x=>{ const b=scoreBand(x.r.score); if(b==="orange")dist.orange++; else if(b==="red")dist.red++; });
+  // --- bottom-right: lagging KPIs among the filled slots ---
+  const lagging = [...scored].filter(x=>scoreBand(x.r.score)!=="green").sort((a,b)=>a.r.score-b.r.score).slice(0,5);
+
+  return (
+    <>
+      <ContentHead sync={`DASHBOARD KPI · ${div==="Math"?"MATEMATIKA":"STATISTIKA"} 2026 · ${filled.length}/${SLOT_COUNT} SLOT TERISI`} title="Capaian KPI">
+        <FilterChip label="Filter" onToast={onToast} />
+        <button onClick={()=>downloadAllKpiXlsx(filled.map(x=>x.r), div==="Math"?"Matematika":"Statistika", onToast)} style={exportBtn}>Download semua</button>
+        {isAdmin && onUpload && (
+          <label style={{ ...exportBtn, marginLeft:8, cursor:"pointer" }} title="Upload data KPI dari file Excel/CSV">
+            Upload
+            <input type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }}
+              onChange={(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f) onUpload(f); }} />
+          </label>
+        )}
+      </ContentHead>
+
+      {filled.length===0 ? (
+        <Panel style={{ marginTop:18, textAlign:"center", padding:"50px 20px" }}>
+          <div style={{ fontSize:16, fontWeight:700, color:"var(--ink)" }}>Belum ada KPI yang dipilih admin.</div>
+          <p style={{ maxWidth:"40em", margin:"10px auto 0", fontSize:12.5, color:"var(--inkMuted)" }}>Admin menentukan KPI mana yang mengisi 8 slot dashboard lewat menu <b>Atur KPI</b>. Setelah diisi, kartunya muncul di sini.</p>
+        </Panel>
+      ) : (
+        <>
+          {/* ===== ROW 1: 8 KPI cards, grid 4x2 (sesuai sketsa) ===== */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginTop:18 }} className="pm-kpicat">
+            {Array.from({length:SLOT_COUNT}).map((_,s)=>{
+              const x = filled.find(f=>f.slotNo===s+1);
+              return x ? <KpiCard key={s} r={x.r} slotNo={x.slotNo} onOpen={setDetail} divName={div==="Math"?"Matematika":"Statistika"} onToast={onToast} /> : <EmptySlotCard key={s} slotNo={s+1} />;
+            })}
+          </div>
+
+          {/* ===== ROW 2: wide chart panel (tengah) ===== */}
+          <Panel style={{ marginTop:14 }}>
+            <PanelHead eyebrow="GAMBAR 1.1" title="Skor per KPI di dashboard"
+              legend={<>
+                <span style={{display:"flex",alignItems:"center",gap:7}}><span style={{width:12,height:12,borderRadius:3,background:"var(--okDot)"}}/>Tercapai (4–6)</span>
+                <span style={{display:"flex",alignItems:"center",gap:7}}><span style={{width:12,height:12,borderRadius:3,background:"var(--orange)"}}/>Perhatian (2–3)</span>
+                <span style={{display:"flex",alignItems:"center",gap:7}}><span style={{width:12,height:12,borderRadius:3,background:"var(--danger)"}}/>Kritis (1)</span>
+              </>}
+              right={<VarChip>BAR SKOR KPI</VarChip>} />
+            <ScoreBarChart data={chartData} />
+            <div style={{ marginTop:11, fontSize:12, lineHeight:1.55, color:"var(--inkMuted)" }}><b style={{color:"var(--ink2)"}}>Sumber:</b> skor tiap KPI dihitung dari score-range (1–6) pada data PI. Tinggi bar = skor, warna = zona capaian.</div>
+          </Panel>
+
+          {/* ===== ROW 3: dua panel bawah (kiri kecil, kanan besar) ===== */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1.55fr", gap:14, marginTop:14 }} className="pm-row2">
+            {/* kiri: sebaran + skor rata-rata */}
+            <Panel>
+              <PanelHead eyebrow="GAMBAR 1.2" title="Ringkasan capaian" right={<VarChip>DONUT SEBARAN</VarChip>} />
+              <div style={{ display:"flex", alignItems:"center", gap:18, marginTop:16 }}>
+                <ScoreDonut dist={dist} total={filled.length} weighted={weighted} />
+                <div style={{ display:"flex", flexDirection:"column", gap:9, fontSize:12.5, flex:1, color:"var(--ink)" }}>
+                  {[["Tercapai",dist.green,"var(--okDot)"],["Perhatian",dist.orange,"var(--orange)"],["Kritis",dist.red,"var(--danger)"],["Belum ada data",dist.none,"var(--inputBg)"]].map(([l,v,c])=>(
+                    <span key={l} style={{ display:"flex", alignItems:"center", gap:8 }}><span style={{ width:9, height:9, borderRadius:3, background:c }}/>{l}<b style={{ marginLeft:"auto" }}>{v}</b></span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginTop:16, padding:"11px 13px", borderRadius:10, background:"var(--panelAlt)", fontSize:12, color:"var(--ink2)" }}>
+                Skor rata-rata tertimbang bobot: <b style={{color:"var(--ink)"}}>{weighted? weighted.toFixed(2):"—"}/6</b> dari {scored.length} KPI terukur.
+              </div>
+            </Panel>
+            {/* kanan: indikator tertinggal */}
+            <Panel>
+              <PanelHead eyebrow="TABEL 1.1" title="KPI perlu perhatian" hint="diurutkan dari skor terendah" right={<VarChip warn>TABLE KPI GAP</VarChip>} />
+              {lagging.length===0 ? (
+                <div style={{ padding:"30px 0", textAlign:"center", color:"var(--okFg)", fontSize:13, fontWeight:600 }}>Semua KPI di dashboard sudah di zona hijau.</div>
+              ) : (
+                <div style={{ marginTop:14 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 78px 78px 62px", gap:10, padding:"0 12px 6px", fontSize:11, fontWeight:700, letterSpacing:".06em", color:"var(--inkFaint)" }}>
+                    <span>INDIKATOR</span><span style={{textAlign:"right"}}>REAL</span><span style={{textAlign:"right"}}>TARGET</span><span style={{textAlign:"right"}}>SKOR</span>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                    {lagging.map((x,i)=>(
+                      <div key={i} onClick={()=>setDetail(x.r)} title="Klik untuk lihat rincian skor"
+                        style={{ display:"grid", gridTemplateColumns:"1fr 78px 78px 62px", gap:10, alignItems:"center", padding:"11px 12px", borderRadius:10, fontSize:12.5, color:"var(--ink)", background:i%2?"var(--panel)":"var(--panelAlt)", cursor:"pointer" }}
+                        onMouseEnter={e=>e.currentTarget.style.filter="brightness(.97)"} onMouseLeave={e=>e.currentTarget.style.filter="none"}>
+                        <span style={{ fontWeight:600, lineHeight:1.3 }}>{x.r.name}</span>
+                        <span style={{ textAlign:"right" }}>{x.r.type==="L"?"—":idr(x.r.real)}</span>
+                        <span style={{ textAlign:"right", color:"var(--inkMuted)" }}>{idr(x.r.target)}</span>
+                        <span style={{ textAlign:"right" }}><ScoreDot score={x.r.score} /></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Panel>
+          </div>
+        </>
+      )}
+      <KpiDetailModal r={detail} onClose={()=>setDetail(null)} divName={div==="Math"?"Matematika":"Statistika"} onToast={onToast} />
+    </>
+  );
+}function EmptySlotCard({ slotNo }) {
+  return (
+    <div style={{ borderRadius:16, background:"var(--panel)", padding:18, border:"2px dashed var(--bSoft)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:172, gap:6 }}>
+      <span style={{ fontSize:10.5, fontWeight:700, letterSpacing:".08em", color:"var(--inkFaint)" }}>SLOT {slotNo}</span>
+      <span style={{ fontSize:12, color:"var(--inkMuted)" }}>Kosong</span>
+    </div>
+  );
+}function ScoreBarChart({ data }) {
+  const H = 150;
+  return (
+    <div style={{ display:"flex", alignItems:"flex-end", gap:14, height:H+34, marginTop:18, paddingTop:10 }}>
+      {data.map((d,i)=>{
+        const b = BANDC[scoreBand(d.score)];
+        const h = d.score==null? 6 : (d.score/6)*H;
+        return (
+          <div key={i} title={d.name} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:8, minWidth:0 }}>
+            <span style={{ fontSize:13, fontWeight:700, color:"var(--ink)" }}>{d.score==null?"—":d.score}</span>
+            <span style={{ width:"100%", maxWidth:56, borderRadius:"7px 7px 4px 4px", height:h, background:b.dot }} />
+            <span style={{ fontSize:11, color:"var(--inkMuted)", whiteSpace:"nowrap" }}>{d.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}function ScoreDonut({ dist, total, weighted }) {
+  const order = [["green","var(--okDot)"],["orange","var(--orange)"],["red","var(--danger)"],["none","var(--inputBg)"]];
+  let acc=0; const stops = order.map(([k,c])=>{ const n=dist[k]||0; const from=acc; acc+=total? (n/total)*100:0; return `${c} ${from}% ${acc}%`; });
+  const grad = `conic-gradient(${stops.join(",")})`;
+  return (
+    <div style={{ position:"relative", width:126, height:126, flex:"none", borderRadius:999, background: total? grad : "var(--inputBg)" }}>
+      <div style={{ position:"absolute", inset:31, borderRadius:999, background:"var(--panel)", display:"grid", placeItems:"center", textAlign:"center" }}>
+        <div><div style={{ fontSize:22, fontWeight:700, lineHeight:1, color:"var(--ink)" }}>{total}</div><div style={{ fontSize:10, fontWeight:600, letterSpacing:".05em", color:"var(--inkMuted)" }}>KPI</div></div>
+      </div>
+    </div>
+  );
+}function KpiCmsModule({ div, rows, slots, setSlots, onToast, onBack }) {
+  const [pickFor, setPickFor] = useState(null); // slot index being edited
+  const usedIdx = new Set(slots.filter(x=>x!=null));
+
+  const assign = (slot, idx) => {
+    setSlots(prev => { const next=[...prev]; next[slot]=idx; return next; });
+    setPickFor(null);
+    onToast("KPI dipasang ke slot "+(slot+1)+".");
+  };
+  const clear = (slot) => { setSlots(prev=>{ const n=[...prev]; n[slot]=null; return n; }); onToast("Slot "+(slot+1)+" dikosongkan."); };
+  const move = (slot, dir) => {
+    const tgt = slot+dir; if(tgt<0||tgt>=SLOT_COUNT) return;
+    setSlots(prev=>{ const n=[...prev]; [n[slot],n[tgt]]=[n[tgt],n[slot]]; return n; });
+  };
+
+  return (
+    <>
+      <button onClick={onBack} style={{ display:"inline-flex", alignItems:"center", gap:6, border:0, background:"none", padding:"4px 2px", marginBottom:14, fontSize:13, fontWeight:600, color:"var(--link)", cursor:"pointer", fontFamily:FONT_UI }}>
+        <span style={{ fontSize:16, lineHeight:1 }}>←</span> Kembali ke Dashboard KPI
+      </button>
+      <ContentHead sync={`ADMIN CONSOLE · TANPA CODING · ${div==="Math"?"MATEMATIKA":"STATISTIKA"}`} title="Atur KPI dashboard">
+        <VarChip>{usedIdx.size}/{SLOT_COUNT} SLOT TERISI</VarChip>
+        <button onClick={()=>{ setSlots(defaultSlots(rows)); onToast("Dikembalikan ke pilihan default."); }} style={exportBtn}>Kembalikan default</button>
+      </ContentHead>
+      <p style={{ margin:"14px 0 0", fontSize:14, lineHeight:1.6, color:"var(--ink2)", maxWidth:"56em" }}>
+        Skeleton dashboard tetap <b>8 slot</b>. Pilih KPI mana yang mengisi tiap slot dari <b>{rows.length} PI</b> yang tersedia. Ganti, kosongkan, atau urutkan — semua tanpa menyentuh kode. Perubahan langsung tampil di dashboard viewer.
+      </p>
+
+      {/* 8 slot editor */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:12, marginTop:18 }} className="pm-row2">
+        {slots.map((idx,slot)=>{
+          const r = idx==null? null : rows[idx];
+          return (
+            <div key={slot} style={{ borderRadius:14, background:"var(--panel)", border:`1px solid ${r?"var(--bFaint)":"var(--bSoft)"}`, padding:14, borderLeft:`3px solid ${r?PERSP_META[r.p].color:"var(--inputBg)"}` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                <span style={{ fontSize:10.5, fontWeight:700, letterSpacing:".08em", color:"var(--inkFaint)" }}>SLOT {slot+1}</span>
+                <div style={{ marginLeft:"auto", display:"flex", gap:4 }}>
+                  <button onClick={()=>move(slot,-1)} disabled={slot===0} style={miniBtn(slot===0)}>↑</button>
+                  <button onClick={()=>move(slot,1)} disabled={slot===SLOT_COUNT-1} style={miniBtn(slot===SLOT_COUNT-1)}>↓</button>
+                </div>
+              </div>
+              {r ? (
+                <>
+                  <div style={{ fontSize:13, fontWeight:700, color:"var(--ink)", lineHeight:1.3, minHeight:34 }}>{r.name}</div>
+                  <div style={{ fontSize:11, color:"var(--inkMuted)", marginTop:4 }}>{r.code||"—"} · {PERSP_META[r.p].short} · Bobot {r.bobot}</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10 }}>
+                    <ScoreDot score={r.score} />
+                    <span style={{ fontSize:12, color:"var(--ink2)" }}>{r.type==="L"?"—":idr(r.real)} / {idr(r.target)} {r.unit}</span>
+                    <div style={{ marginLeft:"auto", display:"flex", gap:6 }}>
+                      <button onClick={()=>setPickFor(slot)} style={{ ...miniAction, background:"var(--inputBg)", color:"var(--ink)" }}>Ganti</button>
+                      <button onClick={()=>clear(slot)} style={{ ...miniAction, background:"var(--warnBg)", color:"var(--warnFgS)" }}>Kosongkan</button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <button onClick={()=>setPickFor(slot)} style={{ width:"100%", padding:"22px 0", borderRadius:10, border:"2px dashed var(--bSoft)", background:"none", color:"var(--inkMuted)", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:FONT_UI }}>+ Pilih KPI untuk slot ini</button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop:16, padding:"15px 16px", borderRadius:12, background:"var(--warnBg)", fontSize:12.5, lineHeight:1.65, color:"var(--warnFgS)" }}>
+        <b style={{color:"var(--warnFg)"}}>Kenapa lewat CMS:</b> daftar PI bisa berubah tiap tahun (nama, jumlah, bobot). Dengan pengaturan slot di sini, dashboard menyesuaikan tanpa coding ulang — admin cukup memasang PI baru ke slot. Prinsip yang sama nanti dipakai untuk modul Mahasiswa & Dosen setelah KPI matang.
+      </div>
+
+      {/* PI picker modal */}
+      {pickFor!=null && (
+        <PiPicker div={div} rows={rows} usedIdx={usedIdx} onPick={(idx)=>assign(pickFor,idx)} onClose={()=>setPickFor(null)} slotNo={pickFor+1} />
+      )}
+    </>
+  );
+}function PiPicker({ div, rows, usedIdx, onPick, onClose, slotNo }) {
+  const [q,setQ] = useState(""); const [pf,setPf] = useState("ALL");
+  const list = rows.map((r,i)=>({r,i})).filter(({r})=>
+    (pf==="ALL"||r.p===pf) && (q===""|| r.name.toLowerCase().includes(q.toLowerCase()) || (r.code||"").toLowerCase().includes(q.toLowerCase()))
+  );
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:800, display:"grid", placeItems:"center", padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:"100%", maxWidth:720, maxHeight:"80vh", background:"var(--panel)", borderRadius:16, boxShadow:"var(--shPop, 0 18px 50px rgba(0,0,0,.4))", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        <div style={{ padding:"18px 20px", borderBottom:"1px solid var(--bFaint)" }}>
+          <div style={{ fontSize:16, fontWeight:700, color:"var(--ink)" }}>Pilih KPI untuk Slot {slotNo}</div>
+          <div style={{ fontSize:12, color:"var(--inkMuted)", marginTop:3 }}>{rows.length} PI · {div==="Math"?"Matematika":"Statistika"} · yang sudah dipakai ditandai</div>
+          <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
+            <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari nama / kode PI…" style={{ flex:1, minWidth:180, height:38, padding:"0 12px", borderRadius:8, border:0, background:"var(--inputBg)", color:"var(--ink)", fontFamily:FONT_UI, fontSize:13, outline:"none" }} />
+            <select value={pf} onChange={e=>setPf(e.target.value)} style={{ height:38, padding:"0 10px", borderRadius:8, border:0, background:"var(--inputBg)", color:"var(--ink)", fontFamily:FONT_UI, fontSize:13 }}>
+              <option value="ALL">Semua perspektif</option>
+              {PERSP_ORDER.map(p=><option key={p} value={p}>{PERSP_META[p].short}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ overflowY:"auto", padding:"8px 12px" }}>
+          {list.map(({r,i})=>{
+            const used = usedIdx.has(i);
+            return (
+              <button key={i} onClick={()=>onPick(i)} style={{ width:"100%", textAlign:"left", display:"grid", gridTemplateColumns:"1fr 84px 60px", gap:10, alignItems:"center", padding:"10px 12px", borderRadius:10, border:0, background:"none", cursor:"pointer", fontFamily:FONT_UI, opacity:used?.55:1 }}
+                onMouseEnter={e=>e.currentTarget.style.background="var(--panelAlt)"} onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                <span>
+                  <span style={{ fontSize:13, fontWeight:600, color:"var(--ink)" }}>{r.name}</span>
+                  <span style={{ display:"block", fontSize:10.5, color:"var(--inkMuted)", marginTop:2 }}>{r.code||"—"} · {PERSP_META[r.p].short}{used?" · sudah dipakai":""}</span>
+                </span>
+                <span style={{ fontSize:12, color:"var(--ink2)", textAlign:"right" }}>{r.type==="L"?"—":idr(r.real)}/{idr(r.target)}</span>
+                <span style={{ textAlign:"right" }}><ScoreDot score={r.score} /></span>
+              </button>
+            );
+          })}
+          {!list.length && <div style={{ textAlign:"center", color:"var(--inkMuted)", padding:30, fontSize:13 }}>Tidak ada PI yang cocok.</div>}
+        </div>
+        <div style={{ padding:"12px 20px", borderTop:"1px solid var(--bFaint)", display:"flex", justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={{ ...exportBtn, marginLeft:0 }}>Tutup</button>
+        </div>
+      </div>
+    </div>
+  );
+}const miniBtn = (dis)=>({ width:24, height:24, borderRadius:6, border:0, background:"var(--inputBg)", color: dis?"var(--inkFaint)":"var(--ink)", cursor:dis?"default":"pointer", fontSize:12, opacity:dis?.5:1 });const miniAction = { padding:"6px 11px", borderRadius:7, border:0, fontSize:11.5, fontWeight:700, cursor:"pointer", fontFamily:FONT_UI };const NavIcon = {
+  summary:<><path d="M3 3v18h18"/><path d="M7 15l3-4 3 3 4-6"/></>,
+  dashboard:<><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></>,
+  master:<><path d="M4 7h16M4 12h16M4 17h16"/></>,
+  pi:<><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></>,
+  monitoring:<><path d="M3 12h4l3 8 4-16 3 8h4"/></>,
+  cms:<><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></>,
+  config:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+  report:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></>,
+  kelola:<><path d="M12 3v18M3 12h18"/><rect x="5" y="5" width="5" height="5" rx="1"/><rect x="14" y="14" width="5" height="5" rx="1"/></>,
+  users:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+};const NAV = [
+  { key:"kpi", label:"Dashboard", icon:"dashboard" },
+  { key:"cms", label:"CMS", icon:"cms", adminOnly:true },
+  { key:"kelola-kpi", label:"Kelola KPI", icon:"kelola", adminOnly:true },
+  { key:"kelola-akun", label:"Kelola Akun", icon:"users", adminOnly:true },
+  { key:"config", label:"Config", icon:"config", adminOnly:true, locked:true },
+];function NavLink({ n, active, collapsed, locked, onClick, t }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      title={collapsed? n.label : (locked?"Menyusul setelah KPI matang":"")}
+      style={{ display:"flex", alignItems:"center", gap:12, width:"100%", padding: collapsed?"11px 0":"11px 14px",
+        justifyContent: collapsed?"center":"flex-start", borderRadius:10, border:0, cursor:"pointer", fontFamily:FONT_UI,
+        background: active? "rgba(255,255,255,.18)" : hov? "rgba(255,255,255,.09)":"transparent",
+        color: active? "#fff" : "rgba(255,255,255,.82)", fontSize:13.5, fontWeight: active?700:600,
+        textAlign:"left", transition:"background .13s", position:"relative", opacity: locked?.62:1 }}>
+      <span style={{ flex:"none", display:"grid", placeItems:"center", width:20, height:20 }}><Icon d={NavIcon[n.icon]} size={18} /></span>
+      {!collapsed && <span style={{ flex:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{n.label}</span>}
+      {!collapsed && locked && <span style={{ fontSize:11, opacity:.85 }}>🔒</span>}
+      {active && <span style={{ position:"absolute", left:0, top:8, bottom:8, width:3, borderRadius:3, background:"#fff" }} />}
+    </button>
+  );
+}function Sidebar({ role, page, collapsed, setCollapsed, onNav, t }) {
+  const isAdmin = role==="admin";
+  const items = NAV.filter(n=> !n.adminOnly || isAdmin);
+  const W = collapsed? 64 : 232;
+  return (
+    <aside style={{ width:W, flex:"none", minHeight:"100vh", background:t.gradMast, color:"#fff",
+      display:"flex", flexDirection:"column", position:"sticky", top:0, alignSelf:"flex-start",
+      transition:"width .18s ease", overflow:"hidden" }}>
+      <div style={{ padding: collapsed?"18px 0":"20px 18px", display:"flex", alignItems:"center", gap:10,
+        justifyContent: collapsed?"center":"flex-start", borderBottom:"1px solid rgba(255,255,255,.14)", minHeight:64 }}>
+        <span style={{ width:32, height:32, flex:"none", borderRadius:9, background:"rgba(255,255,255,.16)", display:"grid", placeItems:"center", fontSize:13, fontWeight:800, letterSpacing:"-.02em" }}>MS</span>
+        {!collapsed && <div style={{ lineHeight:1.2, overflow:"hidden" }}>
+          <div style={{ fontSize:13.5, fontWeight:800, letterSpacing:"-.01em", whiteSpace:"nowrap" }}>MAT &amp; STAT</div>
+          <div style={{ fontSize:10, color:"rgba(255,255,255,.7)", whiteSpace:"nowrap" }}>Monitoring Prodi</div>
+        </div>}
+      </div>
+      <nav style={{ display:"flex", flexDirection:"column", gap:3, padding: collapsed?"12px 8px":"12px 12px", flex:1 }}>
+        {items.map(n=>(
+          <NavLink key={n.key} n={n} t={t} collapsed={collapsed} locked={n.locked}
+            active={page===n.key || (page==="cms" && n.key==="cms")}
+            onClick={()=>onNav(n)} />
+        ))}
+      </nav>
+      <button onClick={()=>setCollapsed(c=>!c)} style={{ display:"flex", alignItems:"center", gap:10,
+        justifyContent: collapsed?"center":"flex-start", margin: collapsed?"0 8px 14px":"0 12px 14px", padding:"10px 14px",
+        borderRadius:10, border:0, cursor:"pointer", background:"rgba(255,255,255,.1)", color:"rgba(255,255,255,.9)",
+        fontSize:12.5, fontWeight:600, fontFamily:FONT_UI }}>
+        <Icon d={collapsed? <path d="M9 18l6-6-6-6"/> : <path d="M15 18l-6-6 6-6"/>} size={17} />
+        {!collapsed && <span>Ciutkan</span>}
+      </button>
+    </aside>
+  );
+}function SummaryView({ div, rows, slots, onNav, onToast }) {
+  const scored = rows.filter(r=>r.score!=null);
+  const green = scored.filter(r=>scoreBand(r.score)==="green").length;
+  let wSum=0,wScore=0; scored.forEach(r=>{ wSum+=(r.bobot||0); wScore+=r.score*(r.bobot||0); });
+  const weighted = wSum? (wScore/wSum):null;
+  const filled = slots.filter(x=>x!=null).length;
+
+  const perspStat = PERSP_ORDER.map(p=>{
+    const g = rows.filter(r=>r.p===p);
+    const gScored = g.filter(r=>r.score!=null);
+    const gGreen = gScored.filter(r=>scoreBand(r.score)==="green").length;
+    return { p, meta:PERSP_META[p], total:g.length, achieved:gGreen, scored:gScored.length };
+  });
+  const divName = div==="Math"?"Matematika":"Statistika";
+
+  return (
+    <>
+      <ContentHead sync={`RINGKASAN · ${divName.toUpperCase()} 2026 · JUNI (Q2)`} title="Summary">
+        <button onClick={()=>onNav({key:"kpi"})} style={exportBtn}>Buka Dashboard →</button>
+      </ContentHead>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginTop:18 }} className="pm-statgrid">
+        <StatCard label="Total KPI" num={rows.length} foot={`${scored.length} sudah terukur · ${rows.length-scored.length} menunggu data`} />
+        <StatCard label="Tercapai (zona hijau)" num={green} foot={`${rows.length? Math.round(green/scored.length*100):0}% dari KPI terukur di zona hijau`} />
+        <StatCard label="Skor tertimbang" num={weighted? weighted.toFixed(2):"—"} foot="Rata-rata skor 1–6 dibobot bobot KPI" />
+        <StatCard label="Slot dashboard" num={`${filled}/${SLOT_COUNT}`} foot="Slot KPI yang dipilih admin untuk tampil" />
+      </div>
+
+      <Panel style={{ marginTop:14 }}>
+        <PanelHead eyebrow="4 PERSPEKTIF" title="Capaian per perspektif" hint="pengelompokan KPI mengikuti Binus Rectorate KPI" right={<VarChip>SUMMARY BSC</VarChip>} />
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginTop:16 }} className="pm-kpicat">
+          {perspStat.map(s=>{
+            const pct = s.scored? Math.round(s.achieved/s.scored*100):0;
+            return (
+              <div key={s.p} style={{ borderRadius:14, background:"var(--panelAlt)", padding:16, borderTop:`3px solid ${s.meta.color}` }}>
+                <div style={{ fontSize:11, fontWeight:700, letterSpacing:".04em", color:s.meta.color }}>{s.meta.short.toUpperCase()}</div>
+                <div style={{ fontSize:12, color:"var(--inkMuted)", marginTop:3, minHeight:32, lineHeight:1.3 }}>{s.meta.label}</div>
+                <div style={{ display:"flex", alignItems:"baseline", gap:5, marginTop:8 }}>
+                  <span style={{ fontSize:30, fontWeight:700, letterSpacing:"-.02em", color:"var(--ink)" }}>{s.achieved}</span>
+                  <span style={{ fontSize:13, color:"var(--inkMuted)" }}>/ {s.total} KPI hijau</span>
+                </div>
+                <div style={{ height:6, borderRadius:3, background:"var(--panelRow)", overflow:"hidden", marginTop:9 }}>
+                  <div style={{ height:6, width:`${pct}%`, background:s.meta.color }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop:14, padding:"11px 13px", borderRadius:10, background:"var(--panelAlt)", fontSize:12, lineHeight:1.55, color:"var(--ink2)" }}>
+          <b style={{color:"var(--ink)"}}>Fokus prioritas:</b> Intake &amp; Active Student (Economic Growth) dan Publikasi FM/MHS (Capacity Building) — sesuai arahan monitoring. Data ditarik sampai <b>Juni (akhir Q2)</b> sebagai periode review.
+        </div>
+      </Panel>
+    </>
+  );
+}function PiTableView({ div, rows, onToast }) {
+  const [q, setQ] = useState("");
+  const [persp, setPersp] = useState("ALL");
+  const divName = div==="Math"?"Matematika":"Statistika";
+  const filtered = rows.filter(r=>{
+    if (persp!=="ALL" && r.p!==persp) return false;
+    if (q && !(`${r.code} ${r.name}`.toLowerCase().includes(q.toLowerCase()))) return false;
+    return true;
+  });
+  return (
+    <>
+      <ContentHead sync={`PERFORMANCE INDICATOR · ${divName.toUpperCase()} · ${rows.length} PI`} title="Performance Indicator">
+        <button onClick={()=>onToast("Export CSV dinonaktifkan pada prototipe.")} style={exportBtn}>Download .xls</button>
+      </ContentHead>
+
+      <Panel style={{ marginTop:18 }}>
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center", marginBottom:14 }}>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari kode / indikator…" style={{
+            flex:"1 1 240px", height:40, padding:"0 14px", borderRadius:9, border:`1px solid ${"var(--bSoft)"}`,
+            background:"var(--inputBg)", color:"var(--ink)", fontSize:13, fontFamily:FONT_UI }} />
+          <div style={{ display:"flex", gap:3, padding:3, borderRadius:9, background:"var(--inputBg)", flexWrap:"wrap" }}>
+            {["ALL",...PERSP_ORDER].map(p=>(
+              <button key={p} onClick={()=>setPersp(p)} style={{ padding:"7px 12px", borderRadius:7, border:0, cursor:"pointer",
+                fontSize:11.5, fontWeight: persp===p?700:600, fontFamily:FONT_UI,
+                background: persp===p?"var(--panel)":"transparent", color: persp===p?"var(--ink)":"var(--inkMuted)" }}>
+                {p==="ALL"?"Semua":PERSP_META[p].short}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ overflowX:"auto" }}>
+          <div style={{ minWidth:720 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"52px 96px 1fr 92px 92px 64px", gap:10, padding:"0 12px 8px", fontSize:11, fontWeight:700, letterSpacing:".05em", color:"var(--inkFaint)" }}>
+              <span>NO</span><span>KODE</span><span>INDIKATOR</span><span style={{textAlign:"right"}}>REAL</span><span style={{textAlign:"right"}}>TARGET</span><span style={{textAlign:"right"}}>SKOR</span>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              {filtered.map((r,i)=>(
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"52px 96px 1fr 92px 92px 64px", gap:10, alignItems:"center", padding:"11px 12px", borderRadius:9, fontSize:12.5, color:"var(--ink)", background:i%2?"var(--panel)":"var(--panelAlt)" }}>
+                  <span style={{ color:"var(--inkFaint)" }}>{r.no}</span>
+                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"var(--inkMuted)" }}>{r.code||"—"}</span>
+                  <span style={{ fontWeight:600, lineHeight:1.3 }}>{r.name}<span style={{ marginLeft:8, fontSize:10.5, fontWeight:700, color:PERSP_META[r.p].color }}>{PERSP_META[r.p].short}</span></span>
+                  <span style={{ textAlign:"right" }}>{r.type==="L"?"—":idr(r.real)}</span>
+                  <span style={{ textAlign:"right", color:"var(--inkMuted)" }}>{idr(r.target)}</span>
+                  <span style={{ textAlign:"right" }}><ScoreDot score={r.score} /></span>
+                </div>
+              ))}
+              {filtered.length===0 && <div style={{ padding:"30px 0", textAlign:"center", color:"var(--inkMuted)", fontSize:13 }}>Tidak ada PI yang cocok.</div>}
+            </div>
+          </div>
+        </div>
+      </Panel>
+    </>
+  );
+}
+
+/* ============================================================
+   CRUD KPI — Admin: Tambah / Edit / Hapus data KPI (PI_ROWS)
+   Data disimpan di React state, dipersistensi ke localStorage.
+   ============================================================ */
+function ConfirmModal({ open, title, message, onConfirm, onCancel }) {
+  if (!open) return null;
+  return ReactDOM.createPortal(
+    <div onClick={onCancel} style={{ position:"fixed", inset:0, zIndex:1300, background:"rgba(0,0,0,.5)", display:"grid", placeItems:"center", padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:"min(420px,100%)", background:"var(--panel)", borderRadius:16, boxShadow:"0 24px 70px rgba(0,0,0,.4)", padding:24 }}>
+        <div style={{ fontSize:17, fontWeight:700, color:"var(--ink)" }}>{title}</div>
+        <p style={{ fontSize:13, color:"var(--inkMuted)", lineHeight:1.6, margin:"10px 0 20px" }}>{message}</p>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+          <button onClick={onCancel} style={{ ...miniAction, background:"var(--inputBg)", color:"var(--ink)", padding:"9px 18px" }}>Batal</button>
+          <button onClick={onConfirm} style={{ ...miniAction, background:"var(--danger)", color:"#fff", padding:"9px 18px" }}>Hapus</button>
+        </div>
+      </div>
+    </div>, document.body
+  );
+}
+
+function KpiFormModal({ open, onClose, onSave, initial, divFilter }) {
+  const empty = { no:"", div:divFilter||"Math", p:"ECO", goal:"", code:"", name:"", unit:"Persentase", type:"Q", fokus:0, prereq:0, bobot:0, target:null, real:null, score:null, prov:"" };
+  const [form, setForm] = useState(initial || empty);
+  useEffect(()=>{ setForm(initial || { ...empty, div:divFilter||"Math" }); }, [initial, open]);
+  if (!open) return null;
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const isEdit = !!initial;
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    const cleaned = {
+      ...form,
+      no: parseInt(form.no)||0,
+      bobot: parseFloat(form.bobot)||0,
+      target: form.target===""||form.target==null? null : parseFloat(form.target),
+      real: form.real===""||form.real==null? null : parseFloat(form.real),
+      score: form.score===""||form.score==null? null : parseInt(form.score),
+      fokus: form.fokus?1:0,
+      prereq: form.prereq?1:0,
+      tq:[null,null,null, form.target===""||form.target==null? null : parseFloat(form.target)],
+      ranges: form.ranges || [null,null,null,null,null,null],
+    };
+    onSave(cleaned);
+  };
+  const inputStyle = { width:"100%", height:38, padding:"0 12px", borderRadius:8, border:0, background:"var(--inputBg)", color:"var(--ink)", fontFamily:FONT_UI, fontSize:13, outline:"none" };
+  const labelStyle = { fontSize:11.5, fontWeight:700, color:"var(--inkMuted)", marginBottom:4, display:"block" };
+  const selectStyle = { ...inputStyle, cursor:"pointer" };
+
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:1200, background:"rgba(0,0,0,.5)", display:"grid", placeItems:"center", padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} className="pm-root" style={{ width:"min(620px,100%)", maxHeight:"88vh", overflowY:"auto", background:"var(--panel)", borderRadius:18, boxShadow:"0 24px 70px rgba(0,0,0,.4)", padding:24 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+          <div style={{ fontSize:17, fontWeight:700, color:"var(--ink)" }}>{isEdit?"Edit KPI":"Tambah KPI Baru"}</div>
+          <button onClick={onClose} style={{ width:32, height:32, borderRadius:8, border:0, cursor:"pointer", background:"var(--inputBg)", color:"var(--ink)", fontSize:16 }}>×</button>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+          <div><label style={labelStyle}>No Urut</label><input value={form.no} onChange={e=>set("no",e.target.value)} type="number" style={inputStyle} placeholder="1" /></div>
+          <div><label style={labelStyle}>Divisi</label>
+            <select value={form.div} onChange={e=>set("div",e.target.value)} style={selectStyle}>
+              <option value="Math">Mathematics</option><option value="Stat">Statistics</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginTop:12 }}><label style={labelStyle}>Nama Indikator *</label><input value={form.name} onChange={e=>set("name",e.target.value)} style={inputStyle} placeholder="Masukkan nama indikator KPI" /></div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:12 }}>
+          <div><label style={labelStyle}>Kode PI</label><input value={form.code} onChange={e=>set("code",e.target.value)} style={inputStyle} placeholder="mis. G4.1.A.1" /></div>
+          <div><label style={labelStyle}>Perspektif</label>
+            <select value={form.p} onChange={e=>set("p",e.target.value)} style={selectStyle}>
+              {PERSP_ORDER.map(p=><option key={p} value={p}>{PERSP_META[p].label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginTop:12 }}><label style={labelStyle}>Goal</label><input value={form.goal||""} onChange={e=>set("goal",e.target.value)} style={inputStyle} placeholder="mis. 4. Student Numbers (G4)" /></div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginTop:12 }}>
+          <div><label style={labelStyle}>Satuan</label><input value={form.unit} onChange={e=>set("unit",e.target.value)} style={inputStyle} placeholder="Persentase" /></div>
+          <div><label style={labelStyle}>Tipe</label>
+            <select value={form.type} onChange={e=>set("type",e.target.value)} style={selectStyle}>
+              <option value="Q">Quantitative</option><option value="L">Qualitative (Level)</option>
+            </select>
+          </div>
+          <div><label style={labelStyle}>Bobot</label><input value={form.bobot} onChange={e=>set("bobot",e.target.value)} type="number" step="0.01" style={inputStyle} /></div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginTop:12 }}>
+          <div><label style={labelStyle}>Target</label><input value={form.target==null?"":form.target} onChange={e=>set("target",e.target.value)} type="number" step="any" style={inputStyle} /></div>
+          <div><label style={labelStyle}>Realisasi</label><input value={form.real==null?"":form.real} onChange={e=>set("real",e.target.value)} type="number" step="any" style={inputStyle} /></div>
+          <div><label style={labelStyle}>Skor (1–6)</label><input value={form.score==null?"":form.score} onChange={e=>set("score",e.target.value)} type="number" min="1" max="6" style={inputStyle} /></div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:12 }}>
+          <div><label style={labelStyle}>PIC</label><input value={form.prov||""} onChange={e=>set("prov",e.target.value)} style={inputStyle} placeholder="Nama penanggung jawab" /></div>
+          <div style={{ display:"flex", gap:18, alignItems:"flex-end", paddingBottom:6 }}>
+            <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, color:"var(--ink)", cursor:"pointer" }}>
+              <input type="checkbox" checked={!!form.fokus} onChange={e=>set("fokus",e.target.checked?1:0)} /> PI Fokus
+            </label>
+            <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, color:"var(--ink)", cursor:"pointer" }}>
+              <input type="checkbox" checked={!!form.prereq} onChange={e=>set("prereq",e.target.checked?1:0)} /> Prerequisite
+            </label>
+          </div>
+        </div>
+
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20, borderTop:"1px solid var(--bFaint)", paddingTop:16 }}>
+          <button onClick={onClose} style={{ ...miniAction, background:"var(--inputBg)", color:"var(--ink)", padding:"10px 20px", fontSize:13 }}>Batal</button>
+          <button onClick={handleSave} style={{ ...miniAction, background:"var(--blue)", color:"#fff", padding:"10px 20px", fontSize:13 }}>{isEdit?"Simpan Perubahan":"Tambah KPI"}</button>
+        </div>
+      </div>
+    </div>, document.body
+  );
+}
+
+function KpiCrudModule({ div, allRows, setAllRows, onToast }) {
+  const [q, setQ] = useState("");
+  const [persp, setPersp] = useState("ALL");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editRow, setEditRow] = useState(null);
+  const [delTarget, setDelTarget] = useState(null);
+
+  const rows = allRows.filter(r=>r.div===div);
+  const filtered = rows.filter(r=>{
+    if (persp!=="ALL" && r.p!==persp) return false;
+    if (q && !(`${r.code} ${r.name} ${r.prov}`.toLowerCase().includes(q.toLowerCase()))) return false;
+    return true;
+  });
+  const divName = div==="Math"?"Matematika":"Statistika";
+
+  const handleAdd = () => { setEditRow(null); setFormOpen(true); };
+  const handleEdit = (r) => { setEditRow(r); setFormOpen(true); };
+  const handleSave = async (data) => {
+    try {
+      if (editRow) {
+        const id = editRow.id_kpi;
+        if (id != null) {
+          const res = await apiFetch("/api/kpi/" + id + "?tahun=" + THN, { method:"PUT", body: JSON.stringify(data) });
+          const saved = (res && res.row) ? res.row : { ...data, id_kpi:id };
+          setAllRows(prev => prev.map(r => r===editRow ? { ...saved, ranges:editRow.ranges||saved.ranges } : r));
+        } else {
+          setAllRows(prev => prev.map(r => r===editRow ? { ...data, ranges:editRow.ranges||data.ranges } : r));
+        }
+        onToast("KPI berhasil diperbarui.");
+      } else {
+        const res = await apiFetch("/api/kpi?tahun=" + THN, { method:"POST", body: JSON.stringify(data) });
+        const saved = (res && res.row) ? res.row : data;
+        setAllRows(prev => [...prev, { ...saved, ranges:saved.ranges||[null,null,null,null,null,null] }]);
+        onToast("KPI baru berhasil ditambahkan.");
+      }
+      setFormOpen(false); setEditRow(null);
+    } catch(err){
+      onToast("Gagal menyimpan ke server: " + err.message);
+    }
+  };
+  const handleDelete = async () => {
+    if (!delTarget) return;
+    try {
+      if (delTarget.id_kpi != null) {
+        await apiFetch("/api/kpi/" + delTarget.id_kpi, { method:"DELETE" });
+      }
+      setAllRows(prev => prev.filter(r => r!==delTarget));
+      onToast("KPI \""+delTarget.name+"\" berhasil dihapus.");
+      setDelTarget(null);
+    } catch(err){
+      onToast("Gagal menghapus di server: " + err.message);
+      setDelTarget(null);
+    }
+  };
+  const handleUpload = async (file) => {
+    if (!file) return;
+    try {
+      onToast("Membaca file…");
+      const raw = await readSheetFile(file);
+      if (!raw || raw.length===0) { onToast("File kosong atau format tidak dikenali."); return; }
+      const importRows = raw.map(r => rowToKpiPayload(r, div)).filter(r => r.name && String(r.name).trim());
+      if (importRows.length===0) { onToast("Tidak ada baris valid (kolom 'Indikator' wajib ada)."); return; }
+      const res = await apiFetch("/api/kpi/import?tahun=" + THN, { method:"POST", body: JSON.stringify({ rows: importRows, tahun: THN }) });
+      onToast("Import: " + (res.inserted||0) + " baru, " + (res.updated||0) + " diperbarui" + (res.failed? ", " + res.failed + " gagal":"") + ". Muat ulang halaman untuk melihat.");
+    } catch(err){
+      onToast("Gagal import: " + err.message);
+    }
+  };
+
+  return (
+    <>
+      <ContentHead sync={`KELOLA DATA KPI · ${divName.toUpperCase()} · ${rows.length} INDIKATOR`} title="Kelola Data KPI">
+        <label style={{ ...exportBtn, cursor:"pointer" }} title="Upload data KPI dari file Excel/CSV">
+          Upload
+          <input type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }}
+            onChange={(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f) handleUpload(f); }} />
+        </label>
+        <button onClick={handleAdd} style={{ ...exportBtn, marginLeft:8, background:"var(--blue)", color:"#fff", fontWeight:700 }}>+ Tambah KPI</button>
+      </ContentHead>
+      <p style={{ margin:"10px 0 0", fontSize:13, lineHeight:1.6, color:"var(--ink2)" }}>
+        Kelola data indikator KPI secara langsung. Tambah indikator baru, edit data realisasi/target, atau hapus indikator yang sudah tidak relevan. Perubahan langsung tercermin di Dashboard dan CMS.
+      </p>
+
+      <Panel style={{ marginTop:16 }}>
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center", marginBottom:14 }}>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari kode / indikator / PIC…" style={{
+            flex:"1 1 240px", height:40, padding:"0 14px", borderRadius:9, border:"1px solid var(--bSoft)",
+            background:"var(--inputBg)", color:"var(--ink)", fontSize:13, fontFamily:FONT_UI }} />
+          <div style={{ display:"flex", gap:3, padding:3, borderRadius:9, background:"var(--inputBg)", flexWrap:"wrap" }}>
+            {["ALL",...PERSP_ORDER].map(p=>(
+              <button key={p} onClick={()=>setPersp(p)} style={{ padding:"7px 12px", borderRadius:7, border:0, cursor:"pointer",
+                fontSize:11.5, fontWeight:persp===p?700:600, fontFamily:FONT_UI,
+                background:persp===p?"var(--panel)":"transparent", color:persp===p?"var(--ink)":"var(--inkMuted)" }}>
+                {p==="ALL"?"Semua":PERSP_META[p].short}</button>
+            ))}
+          </div>
+          <span style={{ fontSize:12, color:"var(--inkMuted)" }}>{filtered.length} ditampilkan</span>
+        </div>
+
+        <div style={{ overflowX:"auto" }}>
+          <div style={{ minWidth:860 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"42px 80px 1fr 80px 80px 50px 90px", gap:8, padding:"0 10px 8px", fontSize:10.5, fontWeight:700, letterSpacing:".05em", color:"var(--inkFaint)" }}>
+              <span>NO</span><span>KODE</span><span>INDIKATOR</span><span style={{textAlign:"right"}}>REAL</span><span style={{textAlign:"right"}}>TARGET</span><span style={{textAlign:"right"}}>SKOR</span><span style={{textAlign:"right"}}>AKSI</span>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+              {filtered.map((r,i)=>(
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"42px 80px 1fr 80px 80px 50px 90px", gap:8, alignItems:"center", padding:"10px 10px", borderRadius:9, fontSize:12.5, color:"var(--ink)", background:i%2?"var(--panel)":"var(--panelAlt)" }}>
+                  <span style={{ color:"var(--inkFaint)" }}>{r.no}</span>
+                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10.5, color:"var(--inkMuted)" }}>{r.code||"—"}</span>
+                  <span style={{ fontWeight:600, lineHeight:1.3 }}>{r.name}
+                    <span style={{ marginLeft:6, fontSize:10, fontWeight:700, color:PERSP_META[r.p].color }}>{PERSP_META[r.p].short}</span>
+                    {r.fokus?<span style={{ marginLeft:5, fontSize:9, padding:"2px 5px", borderRadius:4, background:"var(--okBg)", color:"var(--okFg)", fontWeight:700 }}>FOKUS</span>:""}
+                  </span>
+                  <span style={{ textAlign:"right" }}>{r.type==="L"?"—":idr(r.real)}</span>
+                  <span style={{ textAlign:"right", color:"var(--inkMuted)" }}>{idr(r.target)}</span>
+                  <span style={{ textAlign:"right" }}><ScoreDot score={r.score} /></span>
+                  <span style={{ textAlign:"right", display:"flex", gap:5, justifyContent:"flex-end" }}>
+                    <button onClick={()=>handleEdit(r)} title="Edit" style={{ width:30, height:28, borderRadius:6, border:0, cursor:"pointer", background:"var(--inputBg)", color:"var(--blue)", fontSize:13 }}>✎</button>
+                    <button onClick={()=>setDelTarget(r)} title="Hapus" style={{ width:30, height:28, borderRadius:6, border:0, cursor:"pointer", background:"var(--warnBg)", color:"var(--danger)", fontSize:13 }}>✕</button>
+                  </span>
+                </div>
+              ))}
+              {filtered.length===0 && <div style={{ padding:"30px 0", textAlign:"center", color:"var(--inkMuted)", fontSize:13 }}>Tidak ada data KPI yang cocok.</div>}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <KpiFormModal open={formOpen} onClose={()=>{setFormOpen(false);setEditRow(null);}} onSave={handleSave} initial={editRow} divFilter={div} />
+      <ConfirmModal open={!!delTarget} title="Hapus KPI" message={delTarget? `Apakah Anda yakin ingin menghapus indikator "${delTarget.name}"? Tindakan ini tidak dapat dibatalkan.` : ""} onConfirm={handleDelete} onCancel={()=>setDelTarget(null)} />
+    </>
+  );
+}
+
+/* ============================================================
+   CRUD AKUN — Admin: Tambah / Edit / Hapus akun pengguna
+   ============================================================ */
+const INITIAL_USERS = [
+  { username:"admin", name:"Kaprodi / Staf TU", role:"admin", nidn:"" },
+  { username:"viewer", name:"Dr. Rina Wijayanti", role:"viewer", nidn:"0987654321" },
+];
+
+function UserFormModal({ open, onClose, onSave, initial }) {
+  const empty = { username:"", name:"", role:"viewer", nidn:"", password:"" };
+  const [form, setForm] = useState(initial ? { ...initial, password:"" } : empty);
+  useEffect(()=>{ setForm(initial ? { ...initial, password:"" } : empty); }, [initial, open]);
+  if (!open) return null;
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const isEdit = !!initial;
+  const handleSave = () => {
+    if (!form.username.trim() || !form.name.trim()) return;
+    if (!isEdit && !form.password.trim()) return;
+    onSave(form);
+  };
+  const inputStyle = { width:"100%", height:38, padding:"0 12px", borderRadius:8, border:0, background:"var(--inputBg)", color:"var(--ink)", fontFamily:FONT_UI, fontSize:13, outline:"none" };
+  const labelStyle = { fontSize:11.5, fontWeight:700, color:"var(--inkMuted)", marginBottom:4, display:"block" };
+
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:1200, background:"rgba(0,0,0,.5)", display:"grid", placeItems:"center", padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} className="pm-root" style={{ width:"min(480px,100%)", background:"var(--panel)", borderRadius:18, boxShadow:"0 24px 70px rgba(0,0,0,.4)", padding:24 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+          <div style={{ fontSize:17, fontWeight:700, color:"var(--ink)" }}>{isEdit?"Edit Akun":"Tambah Akun Baru"}</div>
+          <button onClick={onClose} style={{ width:32, height:32, borderRadius:8, border:0, cursor:"pointer", background:"var(--inputBg)", color:"var(--ink)", fontSize:16 }}>×</button>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+          <div><label style={labelStyle}>Username *</label><input value={form.username} onChange={e=>set("username",e.target.value)} style={inputStyle} placeholder="username" disabled={isEdit} /></div>
+          <div><label style={labelStyle}>Nama Lengkap *</label><input value={form.name} onChange={e=>set("name",e.target.value)} style={inputStyle} placeholder="Dr. Nama Lengkap" /></div>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:12 }}>
+          <div><label style={labelStyle}>Role</label>
+            <select value={form.role} onChange={e=>set("role",e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
+              <option value="admin">ADMIN</option><option value="viewer">VIEWER</option>
+            </select>
+          </div>
+          <div><label style={labelStyle}>NIDN (opsional, untuk dosen)</label><input value={form.nidn||""} onChange={e=>set("nidn",e.target.value)} style={inputStyle} placeholder="0987654321" /></div>
+        </div>
+        <div style={{ marginTop:12 }}><label style={labelStyle}>{isEdit?"Password Baru (kosongkan jika tidak diubah)":"Password *"}</label><input value={form.password} onChange={e=>set("password",e.target.value)} type="password" style={inputStyle} placeholder={isEdit?"••••••••":"Masukkan password"} /></div>
+
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20, borderTop:"1px solid var(--bFaint)", paddingTop:16 }}>
+          <button onClick={onClose} style={{ ...miniAction, background:"var(--inputBg)", color:"var(--ink)", padding:"10px 20px", fontSize:13 }}>Batal</button>
+          <button onClick={handleSave} style={{ ...miniAction, background:"var(--blue)", color:"#fff", padding:"10px 20px", fontSize:13 }}>{isEdit?"Simpan":"Tambah Akun"}</button>
+        </div>
+      </div>
+    </div>, document.body
+  );
+}
+
+function UserCrudModule({ onToast }) {
+  const [users, setUsers] = useState(()=>{
+    try { const s=localStorage.getItem("prodi-monitor-users"); return s? JSON.parse(s):INITIAL_USERS; } catch(e){ return INITIAL_USERS; }
+  });
+  const [dbMode, setDbMode] = useState(false); // true kalau tabel akun ada di DB
+  // muat daftar akun dari backend saat modul dibuka; fallback ke localStorage kalau gagal
+  const loadUsers = React.useCallback(async ()=>{
+    try {
+      const res = await apiFetch("/api/akun");
+      if (res && res.table && Array.isArray(res.users)) {
+        setUsers(res.users.map(u=>({ username:u.username, name:u.name||u.username, role:u.role, nidn:u.nidn||"" })));
+        setDbMode(true);
+      } else {
+        setDbMode(false); // tabel belum ada -> tetap pakai localStorage
+      }
+    } catch(e){ setDbMode(false); }
+  }, []);
+  useEffect(()=>{ loadUsers(); }, [loadUsers]);
+  useEffect(()=>{ if(!dbMode){ try { localStorage.setItem("prodi-monitor-users", JSON.stringify(users)); } catch(e){} } }, [users, dbMode]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [delTarget, setDelTarget] = useState(null);
+  const [q, setQ] = useState("");
+
+  const filtered = users.filter(u => !q || `${u.username} ${u.name} ${u.nidn||""}`.toLowerCase().includes(q.toLowerCase()));
+
+  const handleAdd = () => { setEditUser(null); setFormOpen(true); };
+  const handleEdit = (u) => { setEditUser(u); setFormOpen(true); };
+  const handleSave = async (data) => {
+    try {
+      if (editUser) {
+        if (dbMode) {
+          await apiFetch("/api/akun/" + encodeURIComponent(editUser.username), { method:"PUT", body: JSON.stringify(data) });
+        }
+        setUsers(prev => prev.map(u => u.username===editUser.username ? { ...u, name:data.name, role:data.role, nidn:data.nidn } : u));
+        onToast("Akun \""+data.username+"\" berhasil diperbarui.");
+      } else {
+        if (users.find(u=>u.username===data.username)) { onToast("Username sudah ada."); return; }
+        if (dbMode) {
+          await apiFetch("/api/akun", { method:"POST", body: JSON.stringify(data) });
+        }
+        setUsers(prev => [...prev, { username:data.username, name:data.name, role:data.role, nidn:data.nidn||"" }]);
+        onToast("Akun \""+data.username+"\" berhasil ditambahkan.");
+      }
+      setFormOpen(false); setEditUser(null);
+    } catch(err){
+      onToast("Gagal menyimpan akun: " + err.message);
+    }
+  };
+  const handleDelete = async () => {
+    if (!delTarget) return;
+    if (delTarget.username==="admin") { onToast("Akun admin utama tidak dapat dihapus."); setDelTarget(null); return; }
+    try {
+      if (dbMode) {
+        await apiFetch("/api/akun/" + encodeURIComponent(delTarget.username), { method:"DELETE" });
+      }
+      setUsers(prev => prev.filter(u => u.username!==delTarget.username));
+      onToast("Akun \""+delTarget.username+"\" berhasil dihapus.");
+      setDelTarget(null);
+    } catch(err){
+      onToast("Gagal menghapus akun: " + err.message);
+      setDelTarget(null);
+    }
+  };
+  const handleUpload = async (file) => {
+    if (!file) return;
+    try {
+      onToast("Membaca file…");
+      const raw = await readSheetFile(file);
+      if (!raw || raw.length===0) { onToast("File kosong atau format tidak dikenali."); return; }
+      const list = raw.map(rowToAkunPayload).filter(u => u.username && String(u.username).trim());
+      if (list.length===0) { onToast("Tidak ada baris valid (kolom 'username' wajib ada)."); return; }
+      if (dbMode) {
+        const res = await apiFetch("/api/akun/import", { method:"POST", body: JSON.stringify({ users: list }) });
+        onToast("Import akun: " + (res.inserted||0) + " baru, " + (res.updated||0) + " diperbarui" + (res.failed? ", " + res.failed + " gagal":"") + ".");
+        await loadUsers();
+      } else {
+        // tanpa DB: gabung ke state lokal (skip duplikat)
+        setUsers(prev => {
+          const known = new Set(prev.map(u=>u.username));
+          const add = list.filter(u=>!known.has(u.username)).map(u=>({ username:u.username, name:u.name, role:u.role, nidn:u.nidn||"" }));
+          return [...prev, ...add];
+        });
+        onToast("Import " + list.length + " akun (mode lokal, tabel akun belum ada di DB).");
+      }
+    } catch(err){
+      onToast("Gagal import akun: " + err.message);
+    }
+  };
+
+  const roleBadge = (r) => ({
+    padding:"4px 10px", borderRadius:6, fontSize:11, fontWeight:700, letterSpacing:".04em",
+    background: r==="admin"?"var(--okBg)":"var(--warnBg)", color: r==="admin"?"var(--okFg)":"var(--warnFgS)"
+  });
+
+  return (
+    <>
+      <ContentHead sync={`KELOLA AKUN · ${users.length} PENGGUNA TERDAFTAR`} title="Kelola Akun Pengguna">
+        <label style={{ ...exportBtn, cursor:"pointer" }} title="Upload akun dari file Excel/CSV">
+          Upload
+          <input type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }}
+            onChange={(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f) handleUpload(f); }} />
+        </label>
+        <button onClick={handleAdd} style={{ ...exportBtn, marginLeft:8, background:"var(--blue)", color:"#fff", fontWeight:700 }}>+ Tambah Akun</button>
+      </ContentHead>
+      <p style={{ margin:"10px 0 0", fontSize:13, lineHeight:1.6, color:"var(--ink2)" }}>
+        Kelola akun pengguna dashboard. Sesuai PRD, akun disiapkan langsung oleh admin (tanpa registrasi mandiri). Dosen login dengan username = nama, NIDN sebagai kunci relasional.
+      </p>
+
+      <Panel style={{ marginTop:16 }}>
+        <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:14 }}>
+          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari username / nama / NIDN…" style={{
+            flex:"1 1 240px", height:40, padding:"0 14px", borderRadius:9, border:"1px solid var(--bSoft)",
+            background:"var(--inputBg)", color:"var(--ink)", fontSize:13, fontFamily:FONT_UI }} />
+          <span style={{ fontSize:12, color:"var(--inkMuted)" }}>{filtered.length} akun</span>
+        </div>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1.3fr 1fr 90px 110px 80px", gap:10, padding:"0 12px 8px", fontSize:10.5, fontWeight:700, letterSpacing:".05em", color:"var(--inkFaint)" }}>
+            <span>USERNAME</span><span>NAMA</span><span>ROLE</span><span>NIDN</span><span style={{textAlign:"right"}}>AKSI</span>
+          </div>
+          {filtered.map((u,i)=>(
+            <div key={u.username} style={{ display:"grid", gridTemplateColumns:"1.3fr 1fr 90px 110px 80px", gap:10, alignItems:"center", padding:"12px 12px", borderRadius:9, fontSize:13, color:"var(--ink)", background:i%2?"var(--panel)":"var(--panelAlt)" }}>
+              <span title={u.username} style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.username}</span>
+              <span title={u.name} style={{ fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.name}</span>
+              <span><span style={roleBadge(u.role)}>{u.role.toUpperCase()}</span></span>
+              <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:"var(--inkMuted)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.nidn||"—"}</span>
+              <span style={{ textAlign:"right", display:"flex", gap:5, justifyContent:"flex-end" }}>
+                <button onClick={()=>handleEdit(u)} title="Edit" style={{ width:30, height:28, borderRadius:6, border:0, cursor:"pointer", background:"var(--inputBg)", color:"var(--blue)", fontSize:13 }}>✎</button>
+                <button onClick={()=>setDelTarget(u)} title="Hapus" disabled={u.username==="admin"} style={{ width:30, height:28, borderRadius:6, border:0, cursor:u.username==="admin"?"not-allowed":"pointer", background:"var(--warnBg)", color:u.username==="admin"?"var(--inkFaint)":"var(--danger)", fontSize:13, opacity:u.username==="admin"?.4:1 }}>✕</button>
+              </span>
+            </div>
+          ))}
+          {filtered.length===0 && <div style={{ padding:"30px 0", textAlign:"center", color:"var(--inkMuted)", fontSize:13 }}>Tidak ada akun yang cocok.</div>}
+        </div>
+      </Panel>
+
+      <div style={{ marginTop:14, padding:"14px 16px", borderRadius:12, background:"var(--warnBg)", fontSize:12.5, lineHeight:1.65, color:"var(--warnFgS)" }}>
+        <b style={{color:"var(--warnFg)"}}>Catatan:</b> {dbMode ? "Data akun tersambung langsung ke tabel Akun di MySQL — perubahan disimpan permanen di database." : "Tabel Akun belum ada di database, jadi perubahan sementara disimpan di localStorage browser. Jalankan pembuatan tabel Akun (mis. 002_create_akun.sql) supaya CRUD akun tersimpan permanen sesuai class diagram (username sebagai login key, NIDN sebagai FK opsional ke Dosen)."}
+      </div>
+
+      <UserFormModal open={formOpen} onClose={()=>{setFormOpen(false);setEditUser(null);}} onSave={handleSave} initial={editUser} />
+      <ConfirmModal open={!!delTarget} title="Hapus Akun" message={delTarget? `Apakah Anda yakin ingin menghapus akun "${delTarget.username}" (${delTarget.name})? Tindakan ini tidak dapat dibatalkan.` : ""} onConfirm={handleDelete} onCancel={()=>setDelTarget(null)} />
+    </>
+  );
+}
+
+function AppShell({ role, userName, theme, setTheme, onLogout, t }) {
+  const isAdmin = role === "admin";
+  const [page, setPage] = useState("kpi");
+  const [div, setDiv] = useState("Math");
+  const [collapsed, setCollapsed] = useState(()=>{ try { return localStorage.getItem('prodi-monitor-sidebar')==='1'; } catch(e){ return false; } });
+  useEffect(()=>{ try { localStorage.setItem('prodi-monitor-sidebar', collapsed?'1':'0'); } catch(e){} },[collapsed]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+  const [toast, setToast] = useState(null);
+  const showToast = (m) => setToast(m);
+  useEffect(()=>{ if(!toast) return; const id=setTimeout(()=>setToast(null),2400); return ()=>clearTimeout(id); },[toast]);
+
+  // === allRows: mutable state, dipersistensi ke localStorage ===
+  const [allRows, setAllRows] = useState(()=>{
+    try { const s=localStorage.getItem("prodi-monitor-kpi-rows"); return s? JSON.parse(s) : PI_ROWS; } catch(e){ return PI_ROWS; }
+  });
+  useEffect(()=>{ try { localStorage.setItem("prodi-monitor-kpi-rows", JSON.stringify(allRows)); } catch(e){} }, [allRows]);
+
+  // Upload/import KPI dari file (dipakai tombol Upload di dashboard & CMS).
+  const handleKpiUpload = async (file) => {
+    if (!file) return;
+    try {
+      showToast("Membaca file…");
+      const raw = await readSheetFile(file);
+      if (!raw || raw.length===0) { showToast("File kosong atau format tidak dikenali."); return; }
+      const importRows = raw.map(r => rowToKpiPayload(r, div)).filter(r => r.name && String(r.name).trim());
+      if (importRows.length===0) { showToast("Tidak ada baris valid (kolom 'Indikator' wajib ada)."); return; }
+      const res = await apiFetch("/api/kpi/import?tahun=" + THN, { method:"POST", body: JSON.stringify({ rows: importRows, tahun: THN }) });
+      showToast("Import: " + (res.inserted||0) + " baru, " + (res.updated||0) + " diperbarui" + (res.failed? ", " + res.failed + " gagal":"") + ".");
+      // ambil ulang data live dari backend supaya baris baru langsung tampil
+      if (typeof window.__fetchLiveKpiData === "function") {
+        const live = await window.__fetchLiveKpiData();
+        if (live && live.piRows && live.piRows.length) setAllRows(live.piRows);
+      }
+    } catch(err){
+      showToast("Gagal import: " + err.message);
+    }
+  };
+
+  const rowsMath = useMemo(()=>allRows.filter(r=>r.div==="Math"),[allRows]);
+  const rowsStat = useMemo(()=>allRows.filter(r=>r.div==="Stat"),[allRows]);
+  const rows = div==="Math"? rowsMath : rowsStat;
+
+  // slot assignments per division, lifted here so admin edits reflect in viewer
+  const [slotsMath, setSlotsMath] = useState(()=>defaultSlots(rowsMath));
+  const [slotsStat, setSlotsStat] = useState(()=>defaultSlots(rowsStat));
+  const slots = div==="Math"? slotsMath : slotsStat;
+  const setSlots = div==="Math"? setSlotsMath : setSlotsStat;
+
+  const go = (item) => {
+    const key = typeof item === "string" ? item : item.key;
+    const n = typeof item === "string" ? NAV.find(x=>x.key===key) : item;
+    if (n?.locked) { showToast("Modul "+n.label+" menyusul setelah KPI matang."); return; }
+    if (n?.adminOnly && !isAdmin) { showToast("Hanya admin yang dapat mengakses "+n.label+"."); return; }
+    setPage(key); window.scrollTo({top:0});
+  };
+
+  const pageTitle = (NAV.find(n=>n.key===page)||{}).label || "";
+
+  return (
+    <div style={{ display:"flex", alignItems:"flex-start", background:"var(--pageBg)", minHeight:"100vh" }} onClick={()=>setMenuOpen(false)}>
+      <Sidebar role={role} page={page} collapsed={collapsed} setCollapsed={setCollapsed} onNav={go} t={t} />
+
+      <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", minHeight:"100vh" }}>
+        <header style={{ position:"sticky", top:0, zIndex:20, display:"flex", alignItems:"center", gap:14,
+          padding:"12px 24px", background:"var(--panel)", borderBottom:`1px solid ${t.bFaint}`, flexWrap:"wrap" }}>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:".06em", color:"var(--inkMuted)" }}>PRODI.MONITOR</div>
+            <div style={{ fontSize:18, fontWeight:700, letterSpacing:"-.015em", color:"var(--ink)", lineHeight:1.15 }}>{pageTitle}</div>
+          </div>
+          <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:9 }}>
+            <div style={{ display:"flex", background:"var(--inputBg)", borderRadius:9, padding:3 }}>
+              {["Math","Stat"].map(d=>(
+                <button key={d} onClick={()=>setDiv(d)} style={{ padding:"7px 13px", borderRadius:7, border:0, cursor:"pointer", fontSize:11.5, fontWeight:700, background: div===d?t.blue:"transparent", color: div===d?"#fff":"var(--inkMuted)", fontFamily:FONT_UI }}>{d==="Math"?"MAT":"STAT"}</button>
+              ))}
+            </div>
+            <div style={{ background:t.gradMast, borderRadius:999, padding:3 }}><ThemeToggle theme={theme} setTheme={setTheme} t={t} /></div>
+            <div style={{ position:"relative" }}>
+              <button ref={userMenuRef} onClick={(e)=>{ e.stopPropagation(); setMenuOpen(o=>!o); }} style={{ display:"flex", alignItems:"center", gap:9, padding:"5px 12px 5px 5px", borderRadius:9, background:"var(--inputBg)", border:0, cursor:"pointer", color:"var(--ink)" }}>
+                <span style={{ width:28, height:28, borderRadius:7, background:t.blue, color:"#fff", display:"grid", placeItems:"center", fontSize:12, fontWeight:700 }}>{isAdmin?"AP":"DV"}</span>
+                <span style={{ fontSize:10.5, fontWeight:700, letterSpacing:".08em", color:"var(--inkMuted)" }}>{isAdmin?"ADMIN":"VIEWER"}</span>
+              </button>
+              <UserMenuPortal anchorRef={userMenuRef} open={menuOpen} onClose={()=>setMenuOpen(false)}>
+                <div style={{ background:t.panel, border:`1px solid ${t.bSoft}`, borderRadius:12, boxShadow:t.shCard, minWidth:200, padding:8, fontFamily:FONT_UI }}>
+                  <div style={{ padding:"10px 12px", borderBottom:`1px solid ${t.bFaint}`, marginBottom:6 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:t.ink }}>{userName}</div>
+                    <div style={{ fontSize:11.5, color:t.inkMuted, marginTop:2 }}>Role: {isAdmin?"ADMIN":"VIEWER"}</div>
+                  </div>
+                  {isAdmin && <button onClick={()=>{setMenuOpen(false); setPage("cms"); window.scrollTo({top:0});}} style={ddItem(t)}>Atur KPI dashboard</button>}
+                  <button onClick={onLogout} style={ddItem(t)}>Keluar</button>
+                </div>
+              </UserMenuPortal>
+            </div>
+          </div>
+        </header>
+
+        <div style={{ padding:"22px 24px 48px", color:"var(--ink)", flex:1 }}>
+          {page==="kpi" && <KpiDashboard div={div} rows={rows} slots={slots} onToast={showToast} role={role} onUpload={handleKpiUpload} />}
+          {page==="cms" && isAdmin && <KpiCmsModule div={div} rows={rows} slots={slots} setSlots={setSlots} onToast={showToast} onBack={()=>setPage("kpi")} />}
+          {page==="cms" && !isAdmin && <div style={{padding:40, textAlign:"center", color:"var(--inkMuted)"}}>Hanya admin yang dapat mengatur KPI.</div>}
+          {page==="kelola-kpi" && isAdmin && <KpiCrudModule div={div} allRows={allRows} setAllRows={setAllRows} onToast={showToast} />}
+          {page==="kelola-kpi" && !isAdmin && <div style={{padding:40, textAlign:"center", color:"var(--inkMuted)"}}>Hanya admin yang dapat mengelola data KPI.</div>}
+          {page==="kelola-akun" && isAdmin && <UserCrudModule onToast={showToast} />}
+          {page==="kelola-akun" && !isAdmin && <div style={{padding:40, textAlign:"center", color:"var(--inkMuted)"}}>Hanya admin yang dapat mengelola akun.</div>}
+          {page==="config" && <div style={{padding:40, textAlign:"center", color:"var(--inkMuted)"}}>Modul Config (pengaturan mapping variabel &amp; sumber data) menyusul.</div>}
+        </div>
+      </div>
+
+      <div style={{ position:"fixed", bottom:24, left:"50%", transform:`translateX(-50%) translateY(${toast?0:20}px)`, background:t.inkStrong, color:t.pageBg, padding:"12px 20px", borderRadius:10, fontSize:13, fontWeight:600, boxShadow:t.shCard, opacity:toast?1:0, pointerEvents:"none", transition:"opacity .2s, transform .2s", zIndex:900, maxWidth:"90vw", textAlign:"center" }}>{toast}</div>
+    </div>
+  );
+}const ddItem = (t) => ({ display:"block", width:"100%", textAlign:"left", padding:"9px 12px", borderRadius:8, border:0, background:"none", fontSize:13, color:t.ink2, cursor:"pointer", fontFamily:FONT_UI });
+// ============================================================
+//  ROOT — Dashboard page only. Reads auth from localStorage
+//  (written by login.html); redirects back to login.html if
+//  missing. Same keys/behaviour as the team's existing
+//  dashboard.html.
+// ============================================================
+function DashboardApp() {
+  const [auth, setAuth] = useState(undefined); // undefined = checking, null = redirecting
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('prodi-monitor-theme') || 'light'; } catch (e) { return 'light'; }
+  });
+
+  useEffect(() => {
+    let role = null, name = '';
+    try {
+      role = localStorage.getItem('prodi-monitor-role');
+      name = localStorage.getItem('prodi-monitor-name') || '';
+    } catch (e) {}
+    if (!role) { window.location.href = 'login.html'; return; }
+    setAuth({ role, name });
+  }, []);
+
+  const t = theme === 'dark' ? DARK : LIGHT;
+  const cssVars = `--panel:${t.panel};--panelAlt:${t.panelAlt};--panelRow:${t.panelRow};--pageBg:${t.pageBg};--inputBg:${t.inputBg};--ink:${t.ink};--ink2:${t.ink2};--inkMuted:${t.inkMuted};--inkFaint:${t.inkFaint};--blue:${t.blue};--blueDeep:${t.blueDeep};--orange:${t.orange};--link:${t.link};--okBg:${t.okBg};--okFg:${t.okFg};--okDot:${t.okDot};--warnBg:${t.warnBg};--warnFg:${t.warnFg};--warnFgS:${t.warnFgS};--warnChip:${t.warnChip};--danger:${t.danger};--bFaint:${t.bFaint};--bSoft:${t.bSoft};--gradKpi:${t.gradKpi}`;
+  const styleTag = `
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+    .pm-root{${cssVars}}
+    @keyframes pm-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    .pm-root *{box-sizing:border-box}
+    .pm-root ::selection{background:${t.blue};color:#fff}
+    @media (max-width:980px){ .pm-root .pm-statgrid{grid-template-columns:1fr 1fr !important} .pm-root .pm-kpicat{grid-template-columns:1fr 1fr !important} }
+    @media (max-width:900px){ .pm-root .pm-row2{grid-template-columns:1fr !important} }
+    @media (max-width:560px){ .pm-root .pm-statgrid{grid-template-columns:1fr !important} .pm-root .pm-kpicat{grid-template-columns:1fr !important} }
+  `;
+
+  const handleTheme = (mode) => {
+    setTheme(mode);
+    try { localStorage.setItem('prodi-monitor-theme', mode); } catch (e) {}
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('prodi-monitor-role');
+      localStorage.removeItem('prodi-monitor-name');
+    } catch (e) {}
+    window.location.href = 'login.html';
+  };
+
+  if (!auth) return null; // brief blank frame while checking localStorage / redirecting
+
+  return (
+    <div className="pm-root" style={{ fontFamily: FONT_UI, background: t.bgPage, minHeight: "100vh", color: t.ink, transition: "background .25s" }}>
+      <style>{styleTag}</style>
+      <AppShell role={auth.role} userName={auth.name} theme={theme} setTheme={handleTheme} onLogout={handleLogout} t={t} />
+    </div>
+  );
+}
+
+// Dipanggil dari luar (setelah fetch API sukses) untuk menimpa data
+// dummy KPI_AGG/PI_ROWS dengan data asli dari MySQL, SEBELUM di-mount.
+window.__setLiveData = function(agg, piRows){
+  if (agg && Object.keys(agg).length > 0) KPI_AGG = agg;
+  if (piRows && piRows.length > 0) PI_ROWS = piRows;
+};
+
+window.__mountApp = function(){
+  if (window.__appMounted) return;
+  window.__appMounted = true;
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(DashboardApp));
+};
+
+</script>
+
+<script>
+// ============================================================
+// KONEKSI KE BACKEND API (MySQL)
+// Ganti URL ini kalau backend dijalankan di port/host lain.
+// ============================================================
+var API_BASE = 'http://localhost:5000';
+var TAHUN = 2026;
+window.__API_BASE = API_BASE;
+window.__TAHUN = TAHUN;
+
+window.__fetchLiveKpiData = fetchLiveKpiData;
+function fetchLiveKpiData() {
+  var aggUrl = API_BASE + '/api/kpi/agg?tahun=' + TAHUN;
+  var rowsUrl = API_BASE + '/api/kpi/pi-rows?tahun=' + TAHUN;
+  return Promise.all([
+    fetch(aggUrl).then(function (r) { return r.ok ? r.json() : null; }),
+    fetch(rowsUrl).then(function (r) { return r.ok ? r.json() : null; })
+  ]).then(function (results) {
+    return { agg: results[0], piRows: results[1] };
+  }).catch(function (err) {
+    // Backend tidak terjangkau -> dashboard tetap jalan pakai data
+    // dummy bawaan (KPI_AGG/PI_ROWS asli di app-source), tidak fatal.
+    console.warn('Tidak bisa mengambil data dari backend, pakai data contoh bawaan:', err);
+    return { agg: null, piRows: null };
+  });
+}
+
+(function () {
+  try {
+    var source = document.getElementById('app-source').textContent;
+    var compiled = Babel.transform(source, {
+      presets: [['react', { runtime: 'classic' }]]
+    }).code;
+    var factory = new Function('React', compiled);
+    factory(React); // mendefinisikan KPI_AGG, PI_ROWS, window.__setLiveData, window.__mountApp
+
+    fetchLiveKpiData().then(function (live) {
+      if (typeof window.__setLiveData === 'function') {
+        window.__setLiveData(live.agg, live.piRows);
+      }
+      if (typeof window.__mountApp === 'function') {
+        window.__mountApp();
+      }
+    });
+  } catch (err) {
+    var box = document.getElementById('boot-error');
+    box.style.display = 'block';
+    box.textContent = 'Gagal memuat aplikasi:\n' + (err && err.stack ? err.stack : err);
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
